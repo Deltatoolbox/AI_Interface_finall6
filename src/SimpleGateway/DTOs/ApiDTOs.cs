@@ -27,3 +27,5 @@ public record ConversationResponse(string Id, string Title, DateTime CreatedAt, 
 public record MessageResponse(string Id, string Role, string Content, DateTime CreatedAt);
 
 public record ConversationWithMessagesResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, MessageResponse[] Messages);
+
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword);

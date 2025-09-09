@@ -51,26 +51,26 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button
               onClick={() => navigate('/chat')}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Chat
             </button>
             <BarChart3 className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
           </div>
           
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate('/admin/users')}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
               <Settings className="h-5 w-5" />
               <span>User Management</span>
@@ -78,7 +78,7 @@ export default function AdminPage() {
             
             <button
               onClick={handleLogout}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
               <LogOut className="h-5 w-5" />
               <span>Logout</span>
@@ -90,14 +90,14 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Users */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <Users className="h-8 w-8 text-blue-600" />
+                <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Total Users</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {stats?.totalUsers ?? 0}
                 </p>
               </div>
@@ -105,14 +105,14 @@ export default function AdminPage() {
           </div>
 
           {/* Active Users */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <Activity className="h-8 w-8 text-green-600" />
+                <Activity className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Active Users</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Users</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {stats?.activeUsers ?? 0}
                 </p>
               </div>
@@ -120,14 +120,14 @@ export default function AdminPage() {
           </div>
 
           {/* Total Conversations */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <MessageSquare className="h-8 w-8 text-purple-600" />
+                <MessageSquare className="h-8 w-8 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Conversations</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Conversations</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {stats?.totalConversations ?? 0}
                 </p>
               </div>
@@ -135,14 +135,14 @@ export default function AdminPage() {
           </div>
 
           {/* Active Streams */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <Activity className="h-8 w-8 text-orange-600" />
+                <Activity className="h-8 w-8 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Active Streams</p>
-                <p className="text-2xl font-semibold text-gray-900">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Streams</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
                   {stats?.activeStreams ?? 0}
                 </p>
               </div>
@@ -152,13 +152,13 @@ export default function AdminPage() {
 
         {/* Model Usage */}
         {stats?.modelUsage && Object.keys(stats.modelUsage).length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Model Usage</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Model Usage</h3>
             <div className="space-y-3">
               {Object.entries(stats.modelUsage).map(([model, count]) => (
                 <div key={model} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">{model}</span>
-                  <span className="text-sm text-gray-500">{count} requests</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{model}</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">{count} requests</span>
                 </div>
               ))}
             </div>
@@ -166,16 +166,16 @@ export default function AdminPage() {
         )}
 
         {/* System Health */}
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">System Health</h3>
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">System Health</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">Database</span>
-              <span className="text-sm text-green-600 font-medium">Healthy</span>
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Database</span>
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">Healthy</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">LM Studio</span>
-              <span className="text-sm text-green-600 font-medium">Connected</span>
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">LM Studio</span>
+              <span className="text-sm text-green-600 dark:text-green-400 font-medium">Connected</span>
             </div>
           </div>
         </div>

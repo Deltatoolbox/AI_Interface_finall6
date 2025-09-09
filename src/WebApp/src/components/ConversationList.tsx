@@ -68,7 +68,7 @@ export function ConversationList({
   return (
     <div className="flex-1 overflow-y-auto">
       {conversations.length === 0 ? (
-        <div className="p-4 text-center text-gray-500">
+        <div className="p-4 text-center text-gray-500 dark:text-gray-400">
           <p>No conversations yet</p>
           <p className="text-sm">Create your first conversation to get started</p>
         </div>
@@ -79,8 +79,8 @@ export function ConversationList({
               key={conversation.id}
               className={`w-full text-left p-3 rounded-lg transition-colors ${
                 currentConversation?.id === conversation.id
-                  ? 'bg-blue-100 text-blue-900'
-                  : 'hover:bg-gray-100 text-gray-700'
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
             >
               <div className="flex items-start justify-between">
@@ -92,7 +92,7 @@ export function ConversationList({
                       onChange={(e) => setEditTitle(e.target.value)}
                       onKeyDown={handleKeyDown}
                       onBlur={handleEditSave}
-                      className="w-full text-sm font-medium bg-transparent border-none outline-none"
+                      className="w-full text-sm font-medium bg-transparent border-none outline-none text-gray-900 dark:text-gray-100"
                       autoFocus
                     />
                   ) : (
@@ -100,7 +100,7 @@ export function ConversationList({
                       {conversation.title}
                     </p>
                   )}
-                  <div className="flex items-center mt-1 text-xs text-gray-500">
+                  <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
                     <Clock className="h-3 w-3 mr-1" />
                     <span>{formatDate(conversation.updatedAt)}</span>
                   </div>
@@ -110,14 +110,14 @@ export function ConversationList({
                     <>
                       <button
                         onClick={handleEditSave}
-                        className="p-1 hover:bg-gray-200 rounded"
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
                         title="Save"
                       >
                         <Check className="h-3 w-3" />
                       </button>
                       <button
                         onClick={handleEditCancel}
-                        className="p-1 hover:bg-gray-200 rounded"
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
                         title="Cancel"
                       >
                         <X className="h-3 w-3" />

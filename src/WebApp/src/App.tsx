@@ -1,17 +1,20 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { AppearanceProvider } from './contexts/AppearanceContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ChatPage from './pages/ChatPage'
+import SettingsPage from './pages/SettingsPage'
 import AdminPage from './pages/AdminPage'
 import UserManagementPage from './pages/UserManagementPage'
 import DebugPage from './pages/DebugPage'
 
 function App() {
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
+    <AppearanceProvider>
+      <AuthProvider>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -21,6 +24,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ChatPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             } 
           />
@@ -42,8 +53,9 @@ function App() {
           />
           <Route path="/" element={<Navigate to="/chat" replace />} />
         </Routes>
-      </div>
-    </AuthProvider>
+        </div>
+      </AuthProvider>
+    </AppearanceProvider>
   )
 }
 

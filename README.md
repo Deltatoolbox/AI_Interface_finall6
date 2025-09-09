@@ -99,10 +99,6 @@ npm run dev
 ./start.sh
 ```
 
-### Standard-Login
-- **Username:** admin
-- **Password:** admin
-
 ## ⚙️ Konfiguration
 
 ### Backend (appsettings.json)

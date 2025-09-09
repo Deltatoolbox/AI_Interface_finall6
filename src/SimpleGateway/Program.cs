@@ -145,11 +145,29 @@ app.MapGet("/api/auth/csrf", () => new { token = Guid.NewGuid().ToString() });
 // Helper function to get current user from JWT token
 async Task<User?> GetCurrentUserAsync(HttpContext context, IUserService userService, IJwtTokenService jwtService)
 {
-    var token = context.Request.Cookies["access_token"];
+    // Try to get token from Authorization header first
+    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+    string? token = null;
+    
+    if (authHeader?.StartsWith("Bearer ") == true)
+    {
+        token = authHeader.Substring("Bearer ".Length).Trim();
+    }
+    else
+    {
+        // Fallback to cookie
+        token = context.Request.Cookies["access_token"];
+    }
+    
     if (string.IsNullOrEmpty(token))
         return null;
 
-    var userId = jwtService.GetUserIdFromToken(token);
+    // Validate token and get user ID
+    var principal = jwtService.ValidateToken(token);
+    if (principal == null)
+        return null;
+
+    var userId = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
         return null;
 
@@ -436,5 +454,38 @@ app.MapDelete("/api/admin/users/{id}", async (string id, HttpContext context, IU
 
     return Results.NoContent();
 });
+
+// Privacy & Security API Endpoints
+app.MapDelete("/api/conversations", async (HttpContext context, IConversationService conversationService, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    var success = await conversationService.DeleteAllConversationsForUserAsync(user.Id);
+    if (!success)
+        return Results.BadRequest(new { message = "Failed to delete conversations" });
+
+    return Results.Ok(new { message = "All conversations deleted successfully" });
+}).AllowAnonymous();
+
+app.MapPost("/api/auth/change-password", async (ChangePasswordRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    // Verify current password
+    var isValidPassword = await userService.ValidatePasswordAsync(user.Id, request.CurrentPassword);
+    if (!isValidPassword)
+        return Results.BadRequest(new { message = "Current password is incorrect" });
+
+    // Update password
+    var success = await userService.UpdatePasswordAsync(user.Id, request.NewPassword);
+    if (!success)
+        return Results.BadRequest(new { message = "Failed to update password" });
+
+    return Results.Ok(new { message = "Password updated successfully" });
+}).AllowAnonymous();
 
 app.Run();

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { LogOut, Settings, MessageSquare, Plus } from 'lucide-react'
 import { ConversationList } from '../components/ConversationList'
@@ -29,7 +30,8 @@ interface Model {
 }
 
 export default function ChatPage() {
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -241,13 +243,13 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-3">
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <MessageSquare className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900">LM Gateway</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">LM Gateway</h1>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -257,15 +259,13 @@ export default function ChatPage() {
               onModelChange={setSelectedModel}
             />
             
-            {user?.role === 'Admin' && (
-              <a
-                href="/admin"
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
-              >
-                <Settings className="h-5 w-5" />
-                <span>Admin</span>
-              </a>
-            )}
+            <button
+              onClick={() => navigate('/settings')}
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              <Settings className="h-5 w-5" />
+              <span>Settings</span>
+            </button>
             
             <button
               onClick={handleLogout}
@@ -279,9 +279,9 @@ export default function ChatPage() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
+      {/* Sidebar */}
+      <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => createConversation('New Conversation')}
               className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -304,7 +304,7 @@ export default function ChatPage() {
           {currentConversation ? (
             <>
               <MessageList messages={messages} />
-              <div className="border-t border-gray-200 p-4">
+              <div className="border-t border-gray-200 dark:border-gray-700 p-4">
                 <MessageInput
                   onSendMessage={sendMessage}
                   disabled={isStreaming}
@@ -313,9 +313,9 @@ export default function ChatPage() {
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
               <div className="text-center">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
                 <p>Select a conversation or create a new one to start chatting</p>
               </div>
             </div>

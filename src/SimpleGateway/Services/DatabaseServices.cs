@@ -12,8 +12,10 @@ public interface IUserService
     Task<User?> GetUserByIdAsync(string userId);
     Task<User?> CreateUserAsync(string username, string password, string email = "", string role = "User");
     Task<bool> ValidatePasswordAsync(User user, string password);
+    Task<bool> ValidatePasswordAsync(string userId, string password);
     Task<List<User>> GetAllUsersAsync();
     Task<User?> UpdateUserAsync(string userId, string? username, string? email, string? role);
+    Task<bool> UpdatePasswordAsync(string userId, string newPassword);
     Task<bool> DeleteUserAsync(string userId);
     Task<bool> UserExistsAsync(string username);
 }
@@ -24,6 +26,7 @@ public interface IConversationService
     Task<ConversationResponse> CreateConversationAsync(string userId, string title);
     Task<ConversationWithMessagesResponse?> GetConversationWithMessagesAsync(string conversationId, string userId);
     Task<ConversationResponse?> UpdateConversationTitleAsync(string conversationId, string userId, string newTitle);
+    Task<bool> DeleteAllConversationsForUserAsync(string userId);
 }
 
 public interface IMessageService
@@ -73,6 +76,15 @@ public class UserService : IUserService
         return BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
     }
 
+    public async Task<bool> ValidatePasswordAsync(string userId, string password)
+    {
+        var user = await GetUserByIdAsync(userId);
+        if (user == null)
+            return false;
+        
+        return BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
+    }
+
     public async Task<User?> GetUserByIdAsync(string userId)
     {
         return await _context.Users
@@ -119,6 +131,19 @@ public class UserService : IUserService
     {
         return await _context.Users
             .AnyAsync(u => u.Username == username);
+    }
+
+    public async Task<bool> UpdatePasswordAsync(string userId, string newPassword)
+    {
+        var user = await GetUserByIdAsync(userId);
+        if (user == null)
+            return false;
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+        
+        await _context.SaveChangesAsync();
+        return true;
     }
 }
 
@@ -192,6 +217,29 @@ public class ConversationService : IConversationService
         await _context.SaveChangesAsync();
 
         return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt);
+    }
+
+    public async Task<bool> DeleteAllConversationsForUserAsync(string userId)
+    {
+        var conversations = await _context.Conversations
+            .Where(c => c.UserId == userId)
+            .Include(c => c.Messages)
+            .ToListAsync();
+
+        if (!conversations.Any())
+            return true;
+
+        // Delete all messages first (due to foreign key constraints)
+        foreach (var conversation in conversations)
+        {
+            _context.Messages.RemoveRange(conversation.Messages);
+        }
+
+        // Then delete conversations
+        _context.Conversations.RemoveRange(conversations);
+        
+        await _context.SaveChangesAsync();
+        return true;
     }
 }
 
