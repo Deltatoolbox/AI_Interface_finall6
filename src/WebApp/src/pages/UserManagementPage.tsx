@@ -93,11 +93,11 @@ export default function UserManagementPage() {
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center space-x-4">
                 <button
-                  onClick={() => navigate('/admin')}
+                  onClick={() => navigate('/settings')}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Admin
+                  Back to Settings
                 </button>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">User Management</h1>
               </div>
