@@ -1,0 +1,50 @@
+[Unit]
+Description=LM Gateway - LAN Chat Gateway for LM Studio
+Documentation=https://github.com/your-org/lm-gateway
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/opt/lm-gateway/LmGateway.Api
+WorkingDirectory=/opt/lm-gateway
+User=lm-gateway
+Group=lm-gateway
+
+# Environment variables
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5000
+EnvironmentFile=/etc/lm-gateway.env
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/lm-gateway/data /opt/lm-gateway/logs
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+RestrictNamespaces=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lm-gateway
+
+[Install]
+WantedBy=multi-user.target

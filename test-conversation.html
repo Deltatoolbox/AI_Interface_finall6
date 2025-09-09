@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Conversation Test</title>
+</head>
+<body>
+    <h1>New Conversation Test</h1>
+    <button id="testBtn">Test New Conversation</button>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const result = document.getElementById('result');
+            
+            try {
+                console.log('Creating new conversation...');
+                const response = await fetch('http://localhost:5058/api/conversations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ title: 'Test Conversation' }),
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok) {
+                    result.innerHTML = '<p style="color: green;">Conversation created successfully!</p><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    result.innerHTML = '<p style="color: red;">Failed to create conversation!</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                result.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html>

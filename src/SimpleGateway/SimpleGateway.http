@@ -1,0 +1,6 @@
+@SimpleGateway_HostAddress = http://localhost:5058
+
+GET {{SimpleGateway_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

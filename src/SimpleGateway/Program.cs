@@ -1,0 +1,440 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.Extensions.Options;
+using SimpleGateway.Data;
+using SimpleGateway.Services;
+using SimpleGateway.DTOs;
+using SimpleGateway.Models;
+using SimpleGateway.Configuration;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Add configuration
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+builder.Services.Configure<UserManagementSettings>(builder.Configuration.GetSection("UserManagement"));
+
+// Add Entity Framework with SQLite
+builder.Services.AddDbContext<GatewayDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? 
+                     "Data Source=gateway.db"));
+
+// Add JWT Authentication
+var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()!;
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// Add custom services
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IConversationService, ConversationService>();
+builder.Services.AddScoped<IMessageService, MessageService>();
+builder.Services.AddScoped<IJwtTokenService>(provider =>
+{
+    var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
+    return new JwtTokenService(jwtSettings);
+});
+
+// CORS für Frontend-Integration
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+app.UseCors("AllowFrontend");
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Ensure database is created
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
+    context.Database.EnsureCreated();
+    
+    // Create default admin user if not exists
+    var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+    var adminUser = await userService.GetUserByUsernameAsync("admin");
+    if (adminUser == null)
+    {
+        await userService.CreateUserAsync("admin", "admin", "", "Admin");
+        Console.WriteLine("Default admin user created (admin/admin)");
+    }
+}
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+// CORS aktivieren
+app.UseCors("AllowFrontend");
+
+app.MapGet("/", () => "LM Gateway API is running!");
+
+app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
+
+app.MapGet("/api/models", async () =>
+{
+    try
+    {
+        using var httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
+        
+        var response = await httpClient.GetAsync("http://localhost:1234/v1/models");
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"LM Studio Models: {content}");
+            return Results.Content(content, "application/json");
+        }
+        
+        Console.WriteLine("LM Studio nicht verfügbar, verwende Fallback-Modelle");
+        
+        return Results.Ok(new { 
+            data = new[] { 
+                new { id = "llama-2-7b", @object = "model", created = 1234567890, owned_by = "meta" },
+                new { id = "gpt-3.5-turbo", @object = "model", created = 1234567890, owned_by = "openai" }
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Fehler beim Abrufen der Modelle: {ex.Message}");
+        
+        return Results.Ok(new { 
+            data = new[] { 
+                new { id = "llama-2-7b", @object = "model", created = 1234567890, owned_by = "meta" },
+                new { id = "gpt-3.5-turbo", @object = "model", created = 1234567890, owned_by = "openai" }
+            }
+        });
+    }
+});
+
+app.MapGet("/api/auth/csrf", () => new { token = Guid.NewGuid().ToString() });
+
+// Helper function to get current user from JWT token
+async Task<User?> GetCurrentUserAsync(HttpContext context, IUserService userService, IJwtTokenService jwtService)
+{
+    var token = context.Request.Cookies["access_token"];
+    if (string.IsNullOrEmpty(token))
+        return null;
+
+    var userId = jwtService.GetUserIdFromToken(token);
+    if (string.IsNullOrEmpty(userId))
+        return null;
+
+    return await userService.GetUserByIdAsync(userId);
+}
+
+app.MapPost("/api/auth/login", async (LoginRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await userService.GetUserByUsernameAsync(request.Username);
+    
+    if (user != null && await userService.ValidatePasswordAsync(user, request.Password))
+    {
+        var token = jwtService.GenerateToken(user);
+        
+        // Setze JWT Token als Cookie
+        context.Response.Cookies.Append("access_token", token, new CookieOptions
+        {
+            HttpOnly = false,
+            Secure = false,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTime.UtcNow.AddHours(24),
+            Domain = "localhost"
+        });
+        
+        var userResponse = new UserResponse(user.Id, user.Username, user.Email, user.Role, user.CreatedAt);
+        return Results.Ok(new LoginResponse(true, token, "Login successful", userResponse));
+    }
+    
+    return Results.Unauthorized();
+});
+
+app.MapPost("/api/auth/logout", (HttpContext context) =>
+{
+    context.Response.Cookies.Delete("access_token");
+    return Results.NoContent();
+});
+
+// User Registration API
+app.MapPost("/api/auth/register", async (RegisterRequest request, IUserService userService, IConfiguration config) =>
+{
+    var userManagementSettings = config.GetSection("UserManagement").Get<UserManagementSettings>();
+    
+    if (!userManagementSettings?.AllowSelfRegistration ?? true)
+    {
+        return Results.BadRequest(new RegisterResponse(false, "Self-registration is disabled"));
+    }
+
+    if (await userService.UserExistsAsync(request.Username))
+    {
+        return Results.BadRequest(new RegisterResponse(false, "Username already exists"));
+    }
+
+    var user = await userService.CreateUserAsync(request.Username, request.Password, request.Email, userManagementSettings?.DefaultRole ?? "User");
+    if (user == null)
+    {
+        return Results.BadRequest(new RegisterResponse(false, "Failed to create user"));
+    }
+
+    var userResponse = new UserResponse(user.Id, user.Username, user.Email, user.Role, user.CreatedAt);
+    return Results.Ok(new RegisterResponse(true, "User created successfully", userResponse));
+});
+
+// Conversation endpoints
+app.MapGet("/api/conversations", async (HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+    
+    var conversations = await conversationService.GetConversationsByUserIdAsync(user.Id);
+    return Results.Ok(new { data = conversations });
+});
+
+app.MapPost("/api/conversations", async (CreateConversationRequest request, HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+    
+    var conversation = await conversationService.CreateConversationAsync(user.Id, request.Title);
+    Console.WriteLine($"Conversation erstellt: {conversation.Id} - {request.Title}");
+    
+    return Results.Ok(conversation);
+});
+
+app.MapGet("/api/conversations/{id}", async (string id, HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+    
+    var conversation = await conversationService.GetConversationWithMessagesAsync(id, user.Id);
+    if (conversation == null)
+        return Results.NotFound();
+    
+    return Results.Ok(new { messages = conversation.Messages });
+});
+
+app.MapPut("/api/conversations/{id}", async (string id, UpdateConversationRequest request, HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+    
+    var conversation = await conversationService.UpdateConversationTitleAsync(id, user.Id, request.Title);
+    if (conversation == null)
+        return Results.NotFound();
+    
+    Console.WriteLine($"Conversation umbenannt: {id} - {request.Title}");
+    
+    return Results.Ok(conversation);
+});
+
+app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+    
+    try
+    {
+        using var httpClient = new HttpClient();
+        
+        var lmStudioRequest = new
+        {
+            model = request.Model,
+            messages = request.Messages.Select(m => new { role = m.Role, content = m.Content }),
+            max_tokens = 1000,
+            temperature = 0.7
+        };
+        
+        var json = System.Text.Json.JsonSerializer.Serialize(lmStudioRequest);
+        Console.WriteLine($"Sending to LM Studio: {json}");
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        
+        var response = await httpClient.PostAsync("http://localhost:1234/v1/chat/completions", content);
+        
+        Console.WriteLine($"LM Studio Response Status: {response.StatusCode}");
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var responseContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"LM Studio Response: {responseContent}");
+            
+            // Speichere Messages wenn ConversationId vorhanden ist
+            if (!string.IsNullOrEmpty(request.ConversationId))
+            {
+                await messageService.SaveMessagesAsync(request.ConversationId, request.Messages);
+                
+                // Speichere Assistant Response
+                var assistantContent = "Keine Antwort";
+                try
+                {
+                    var jsonDoc = System.Text.Json.JsonDocument.Parse(responseContent);
+                    if (jsonDoc.RootElement.TryGetProperty("choices", out var choices) && 
+                        choices.GetArrayLength() > 0 &&
+                        choices[0].TryGetProperty("message", out var message) &&
+                        message.TryGetProperty("content", out var contentProp))
+                    {
+                        assistantContent = contentProp.GetString() ?? "Keine Antwort";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Fehler beim Parsen der LM Studio Antwort: {ex.Message}");
+                }
+                
+                await messageService.SaveAssistantMessageAsync(request.ConversationId, assistantContent);
+                Console.WriteLine($"Messages gespeichert für Conversation: {request.ConversationId}");
+            }
+            
+            return Results.Content(responseContent, "application/json");
+        }
+        
+        // Fallback zu Mock-Antwort wenn LM Studio nicht verfügbar
+        return Results.Ok(new { 
+            id = "chatcmpl-123",
+            @object = "chat.completion",
+            created = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            model = request.Model,
+            choices = new[] {
+                new {
+                    index = 0,
+                    message = new {
+                        role = "assistant",
+                        content = $"Echo: {request.Messages.LastOrDefault()?.Content ?? "Hello!"}"
+                    },
+                    finish_reason = "stop"
+                }
+            },
+            usage = new {
+                prompt_tokens = 10,
+                completion_tokens = 5,
+                total_tokens = 15
+            }
+        });
+    }
+    catch
+    {
+        // Fallback zu Mock-Antwort bei Fehlern
+        return Results.Ok(new { 
+            id = "chatcmpl-123",
+            @object = "chat.completion",
+            created = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            model = request.Model,
+            choices = new[] {
+                new {
+                    index = 0,
+                    message = new {
+                        role = "assistant",
+                        content = $"Echo: {request.Messages.LastOrDefault()?.Content ?? "Hello!"}"
+                    },
+                    finish_reason = "stop"
+                }
+            },
+            usage = new {
+                prompt_tokens = 10,
+                completion_tokens = 5,
+                total_tokens = 15
+            }
+        });
+    }
+});
+
+// Admin User Management APIs
+app.MapGet("/api/admin/users", async (HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null || user.Role != "Admin")
+        return Results.Unauthorized();
+
+    var users = await userService.GetAllUsersAsync();
+    var userResponses = users.Select(u => new UserResponse(u.Id, u.Username, u.Email, u.Role, u.CreatedAt)).ToList();
+    return Results.Ok(userResponses);
+});
+
+app.MapPost("/api/admin/users", async (CreateUserRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null || user.Role != "Admin")
+        return Results.Unauthorized();
+
+    if (await userService.UserExistsAsync(request.Username))
+    {
+        return Results.BadRequest(new { message = "Username already exists" });
+    }
+
+    var newUser = await userService.CreateUserAsync(request.Username, request.Password, request.Email, request.Role);
+    if (newUser == null)
+    {
+        return Results.BadRequest(new { message = "Failed to create user" });
+    }
+
+    var userResponse = new UserResponse(newUser.Id, newUser.Username, newUser.Email, newUser.Role, newUser.CreatedAt);
+    return Results.Ok(userResponse);
+});
+
+app.MapPut("/api/admin/users/{id}", async (string id, UpdateUserRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null || user.Role != "Admin")
+        return Results.Unauthorized();
+
+    var updatedUser = await userService.UpdateUserAsync(id, request.Username, request.Email, request.Role);
+    if (updatedUser == null)
+        return Results.NotFound();
+
+    var userResponse = new UserResponse(updatedUser.Id, updatedUser.Username, updatedUser.Email, updatedUser.Role, updatedUser.CreatedAt);
+    return Results.Ok(userResponse);
+});
+
+app.MapDelete("/api/admin/users/{id}", async (string id, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null || user.Role != "Admin")
+        return Results.Unauthorized();
+
+    if (user.Id == id)
+        return Results.BadRequest(new { message = "Cannot delete your own account" });
+
+    var success = await userService.DeleteUserAsync(id);
+    if (!success)
+        return Results.NotFound();
+
+    return Results.NoContent();
+});
+
+app.Run();
