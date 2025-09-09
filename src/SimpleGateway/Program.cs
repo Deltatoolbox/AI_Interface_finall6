@@ -455,6 +455,55 @@ app.MapDelete("/api/admin/users/{id}", async (string id, HttpContext context, IU
     return Results.NoContent();
 });
 
+        // Admin stats endpoint
+        app.MapGet("/api/admin/stats", async (HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService, GatewayDbContext dbContext) =>
+        {
+            var user = await GetCurrentUserAsync(context, userService, jwtService);
+            if (user == null || user.Role != "Admin")
+                return Results.Unauthorized();
+
+            try
+            {
+                // Get all users
+                var users = await userService.GetAllUsersAsync();
+                var totalUsers = users.Count;
+
+                // Get all conversations from all users
+                var allConversations = new List<ConversationResponse>();
+                var totalMessages = 0;
+                
+                foreach (var u in users)
+                {
+                    var userConversations = await conversationService.GetConversationsByUserIdAsync(u.Id);
+                    allConversations.AddRange(userConversations);
+                    
+                    // Count messages for each conversation using direct DbContext
+                    foreach (var conv in userConversations)
+                    {
+                        var messageCount = await dbContext.Messages
+                            .Where(m => m.ConversationId == conv.Id)
+                            .CountAsync();
+                        totalMessages += messageCount;
+                    }
+                }
+
+                var stats = new
+                {
+                    totalUsers,
+                    totalConversations = allConversations.Count,
+                    totalMessages,
+                    lastUpdated = DateTime.UtcNow
+                };
+
+                return Results.Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting admin stats: {ex.Message}");
+                return Results.Problem("Failed to get admin statistics");
+            }
+        });
+
 // Privacy & Security API Endpoints
 app.MapDelete("/api/conversations", async (HttpContext context, IConversationService conversationService, IUserService userService, IJwtTokenService jwtService) =>
 {
@@ -487,5 +536,25 @@ app.MapPost("/api/auth/change-password", async (ChangePasswordRequest request, H
 
     return Results.Ok(new { message = "Password updated successfully" });
 }).AllowAnonymous();
+
+// Admin password reset endpoint
+app.MapPost("/api/admin/reset-password", async (ResetPasswordRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var adminUser = await GetCurrentUserAsync(context, userService, jwtService);
+    if (adminUser == null || adminUser.Role != "Admin")
+        return Results.Unauthorized();
+
+    // Find the user to reset password for
+    var targetUser = await userService.GetUserByUsernameAsync(request.Username);
+    if (targetUser == null)
+        return Results.BadRequest(new { message = "User not found" });
+
+    // Update password
+    var success = await userService.UpdatePasswordAsync(targetUser.Id, request.NewPassword);
+    if (!success)
+        return Results.BadRequest(new { message = "Failed to reset password" });
+
+    return Results.Ok(new { message = $"Password reset successfully for user {request.Username}" });
+});
 
 app.Run();

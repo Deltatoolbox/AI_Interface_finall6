@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../api'
-import { Plus, Edit2, Trash2, User, Mail, Shield, ArrowLeft } from 'lucide-react'
+import { Plus, Edit2, Trash2, User, Mail, Shield, ArrowLeft, Key } from 'lucide-react'
 
 interface User {
   id: string
@@ -18,6 +18,7 @@ export default function UserManagementPage() {
   const [error, setError] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [resettingPassword, setResettingPassword] = useState<User | null>(null)
   
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -70,6 +71,17 @@ export default function UserManagementPage() {
     } catch (error) {
       setError('Failed to delete user')
       console.error('Error deleting user:', error)
+    }
+  }
+
+  const handleResetPassword = async (username: string, newPassword: string) => {
+    try {
+      await api.resetPassword(username, newPassword)
+      setResettingPassword(null)
+      setError('')
+    } catch (error) {
+      setError('Failed to reset password')
+      console.error('Error resetting password:', error)
     }
   }
 
@@ -176,13 +188,22 @@ export default function UserManagementPage() {
                           <button
                             onClick={() => setEditingUser(userItem)}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                            title="Edit user"
                           >
                             <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setResettingPassword(userItem)}
+                            className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
+                            title="Reset password"
+                          >
+                            <Key className="h-4 w-4" />
                           </button>
                           {userItem.id !== user?.id && (
                             <button
                               onClick={() => handleDeleteUser(userItem.id)}
                               className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                              title="Delete user"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -212,6 +233,15 @@ export default function UserManagementPage() {
           user={editingUser}
           onClose={() => setEditingUser(null)}
           onSubmit={(userData) => handleUpdateUser(editingUser.id, userData)}
+        />
+      )}
+
+      {/* Reset Password Modal */}
+      {resettingPassword && (
+        <ResetPasswordModal
+          user={resettingPassword}
+          onClose={() => setResettingPassword(null)}
+          onSubmit={(newPassword) => handleResetPassword(resettingPassword.username, newPassword)}
         />
       )}
     </div>
@@ -364,6 +394,83 @@ function EditUserModal({ user, onClose, onSubmit }: { user: User; onClose: () =>
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
               >
                 Update User
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Reset Password Modal Component
+function ResetPasswordModal({ user, onClose, onSubmit }: { user: User; onClose: () => void; onSubmit: (newPassword: string) => void }) {
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters long')
+      return
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    
+    onSubmit(newPassword)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div className="mt-3">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            Reset Password for {user.username}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">New Password</label>
+              <input
+                type="password"
+                required
+                className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm Password</label>
+              <input
+                type="password"
+                required
+                className="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-blue-500 focus:border-blue-500"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+              />
+            </div>
+            {error && (
+              <div className="text-red-600 dark:text-red-400 text-sm">{error}</div>
+            )}
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-md"
+              >
+                Reset Password
               </button>
             </div>
           </form>

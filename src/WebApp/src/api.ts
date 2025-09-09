@@ -89,6 +89,17 @@ export const api = {
     if (!response.ok) throw new Error('Failed to delete user')
   },
 
+  async resetPassword(username: string, newPassword: string) {
+    const response = await fetch(`${API_BASE_URL}/api/admin/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, newPassword }),
+    })
+    if (!response.ok) throw new Error('Failed to reset password')
+    return response.json()
+  },
+
   async getCsrfToken() {
     const response = await fetch(`${API_BASE_URL}/api/auth/csrf`, {
       credentials: 'include'

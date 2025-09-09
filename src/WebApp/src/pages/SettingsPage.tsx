@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { useNavigate } from 'react-router-dom'
-import { Settings, User, Shield, LogOut, ArrowLeft, Bell, Palette, Database, Key, Trash2, Lock, AlertTriangle } from 'lucide-react'
+import { Settings, User, Shield, LogOut, ArrowLeft, Palette, Database, Key, Trash2, Lock, AlertTriangle } from 'lucide-react'
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
@@ -99,7 +99,6 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'privacy', label: 'Privacy', icon: Shield },
     ...(user?.role === 'Admin' ? [{ id: 'admin', label: 'Admin Dashboard', icon: Database }] : [])
@@ -210,37 +209,6 @@ export default function SettingsPage() {
                             {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                           </span>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'notifications' && (
-                  <div>
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">Notification Settings</h2>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Chat Notifications</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Receive notifications for new messages</p>
-                        </div>
-                        <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">System Updates</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Receive notifications about system updates</p>
-                        </div>
-                        <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Admin Alerts</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Receive important admin notifications</p>
-                        </div>
-                        <input type="checkbox" className="h-4 w-4 text-blue-600 rounded" />
                       </div>
                     </div>
                   </div>
