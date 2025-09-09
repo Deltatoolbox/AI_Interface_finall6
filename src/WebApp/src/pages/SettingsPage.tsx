@@ -34,8 +34,8 @@ export default function SettingsPage() {
     try {
       const response = await fetch('/api/conversations', {
         method: 'DELETE',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           'Content-Type': 'application/json'
         }
       })
@@ -72,8 +72,8 @@ export default function SettingsPage() {
     try {
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
