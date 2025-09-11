@@ -85,13 +85,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Ensure database is created
-using (var scope = app.Services.CreateScope())
+using (var dbScope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
+    var context = dbScope.ServiceProvider.GetRequiredService<GatewayDbContext>();
     context.Database.EnsureCreated();
     
     // Create default admin user if not exists
-    var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+    var userService = dbScope.ServiceProvider.GetRequiredService<IUserService>();
     var adminUser = await userService.GetUserByUsernameAsync("admin");
     if (adminUser == null)
     {
@@ -1537,5 +1537,18 @@ app.MapPost("/api/guest/cleanup", async (GuestCleanupRequest request, HttpContex
         return Results.Problem("Failed to cleanup guests");
     }
 });
+
+// Initialize services and default data
+await using var initScope = app.Services.CreateAsyncScope();
+var initUserService = initScope.ServiceProvider.GetRequiredService<IUserService>();
+var initUserRoleService = initScope.ServiceProvider.GetRequiredService<IUserRoleService>();
+var initTemplateService = initScope.ServiceProvider.GetRequiredService<IChatTemplateService>();
+var initHealthService = initScope.ServiceProvider.GetRequiredService<IHealthMonitoringService>();
+
+// Initialize default data
+await initUserRoleService.InitializeDefaultRolesAsync(); // Initialize roles first
+await initUserService.InitializeDefaultUsersAsync();
+await initTemplateService.SeedBuiltInTemplatesAsync();
+await initHealthService.StartHealthMonitoringAsync();
 
 app.Run();

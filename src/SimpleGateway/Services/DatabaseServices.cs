@@ -18,6 +18,7 @@ public interface IUserService
     Task<bool> UpdatePasswordAsync(string userId, string newPassword);
     Task<bool> DeleteUserAsync(string userId);
     Task<bool> UserExistsAsync(string username);
+    Task InitializeDefaultUsersAsync();
 }
 
 public interface IConversationService
@@ -194,25 +195,50 @@ public class UserService : IUserService
             .FirstOrDefaultAsync(u => u.Username == username);
     }
 
-    public async Task<User?> CreateUserAsync(string username, string password, string email = "", string role = "User")
+    public async Task<User?> CreateUserAsync(string username, string password, string email = "", string roleName = "User")
     {
         var existingUser = await GetUserByUsernameAsync(username);
         if (existingUser != null)
             return null;
 
-        var user = new User
+        // Find the role by name
+        var role = await _context.UserRoles.FirstOrDefaultAsync(r => r.Name == roleName);
+        if (role == null)
+        {
+            // If role doesn't exist, use default "User" role
+            role = await _context.UserRoles.FirstOrDefaultAsync(r => r.Name == "User");
+            if (role == null)
+            {
+                // If no roles exist, create a basic user without role
+                var user = new User
+                {
+                    Username = username,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    Email = email,
+                    Role = roleName, // Fallback to old system
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+                return user;
+            }
+        }
+
+        var newUser = new User
         {
             Username = username,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             Email = email,
-            Role = role,
+            Role = roleName, // Keep for backward compatibility
+            RoleId = role.Id, // Use new role system
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
-        _context.Users.Add(user);
+        _context.Users.Add(newUser);
         await _context.SaveChangesAsync();
-        return user;
+        return newUser;
     }
 
     public async Task<bool> ValidatePasswordAsync(User user, string password)
@@ -288,6 +314,48 @@ public class UserService : IUserService
         
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task InitializeDefaultUsersAsync()
+    {
+        var existingUsers = await _context.Users.AnyAsync();
+        if (existingUsers) return;
+
+        // Create default users with proper roles
+        var adminRole = await _context.UserRoles.FirstOrDefaultAsync(r => r.Name == "Admin");
+        var userRole = await _context.UserRoles.FirstOrDefaultAsync(r => r.Name == "User");
+
+        if (adminRole != null)
+        {
+            var adminUser = new User
+            {
+                Username = "admin",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin"),
+                Email = "admin@example.com",
+                Role = "Admin",
+                RoleId = adminRole.Id,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.Users.Add(adminUser);
+        }
+
+        if (userRole != null)
+        {
+            var testUser = new User
+            {
+                Username = "test",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("test"),
+                Email = "test@example.com",
+                Role = "User",
+                RoleId = userRole.Id,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.Users.Add(testUser);
+        }
+
+        await _context.SaveChangesAsync();
     }
 }
 
