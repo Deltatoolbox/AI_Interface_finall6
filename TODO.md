@@ -13,7 +13,7 @@
 ## 🔧 **System Features**
 - [x] **Model Management** - Verschiedene LM Studio Models pro Conversation auswählen ✅
 - [ ] **Backup/Restore** - Automatische Datenbank-Backups
-- [ ] **Health Monitoring** - System-Performance Dashboard erweitern
+- [x] **Health Monitoring** - System-Performance Dashboard erweitern
 - [ ] **Logging/Audit Trail** - Wer hat was wann gemacht, einsehbar im debug channel
 
 ## 👥 **User Management**

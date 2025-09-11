@@ -51,6 +51,7 @@ builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<IChatTemplateService, ChatTemplateService>();
 builder.Services.AddScoped<IBackupService, BackupService>();
+builder.Services.AddScoped<IHealthMonitoringService, HealthMonitoringService>();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -1032,6 +1033,63 @@ app.MapPost("/api/backups/upload", async (HttpContext context, IUserService user
     {
         Console.WriteLine($"Error uploading backup: {ex.Message}");
         return Results.Problem("Failed to upload backup");
+    }
+});
+
+// Health Monitoring Endpoints
+app.MapGet("/api/health", async (IHealthMonitoringService healthService) =>
+{
+    try
+    {
+        var health = await healthService.GetSystemHealthAsync();
+        return Results.Ok(health);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting system health: {ex.Message}");
+        return Results.Problem("Failed to get system health");
+    }
+});
+
+app.MapGet("/api/health/metrics", async (IHealthMonitoringService healthService) =>
+{
+    try
+    {
+        var metrics = await healthService.GetSystemMetricsAsync();
+        return Results.Ok(metrics);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting system metrics: {ex.Message}");
+        return Results.Problem("Failed to get system metrics");
+    }
+});
+
+app.MapGet("/api/health/services", async (IHealthMonitoringService healthService) =>
+{
+    try
+    {
+        var services = await healthService.GetServiceStatusesAsync();
+        return Results.Ok(services);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting service statuses: {ex.Message}");
+        return Results.Problem("Failed to get service statuses");
+    }
+});
+
+app.MapPost("/api/health/check/{serviceName}", async (string serviceName, IHealthMonitoringService healthService) =>
+{
+    try
+    {
+        var isHealthy = await healthService.CheckServiceHealthAsync(serviceName);
+        return Results.Ok(new { serviceName, isHealthy, timestamp = DateTime.UtcNow });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error checking service health: {ex.Message}");
+        return Results.Problem("Failed to check service health");
     }
 });
 

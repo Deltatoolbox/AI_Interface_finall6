@@ -342,5 +342,42 @@ export const api = {
     })
     if (!response.ok) throw new Error('Failed to upload backup')
     return response.json()
+  },
+
+  // Health Monitoring API
+  async getSystemHealth() {
+    const response = await fetch(`${API_BASE_URL}/api/health`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get system health')
+    return response.json()
+  },
+
+  async getSystemMetrics() {
+    const response = await fetch(`${API_BASE_URL}/api/health/metrics`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get system metrics')
+    return response.json()
+  },
+
+  async getServiceStatuses() {
+    const response = await fetch(`${API_BASE_URL}/api/health/services`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get service statuses')
+    return response.json()
+  },
+
+  async checkServiceHealth(serviceName: string) {
+    const response = await fetch(`${API_BASE_URL}/api/health/check/${serviceName}`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to check service health')
+    return response.json()
   }
 }

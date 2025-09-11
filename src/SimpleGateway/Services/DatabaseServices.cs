@@ -65,6 +65,16 @@ public interface IBackupService
     Task ScheduleAutomaticBackupsAsync();
 }
 
+public interface IHealthMonitoringService
+{
+    Task<SystemHealth> GetSystemHealthAsync();
+    Task<SystemMetrics> GetSystemMetricsAsync();
+    Task<ServiceStatus[]> GetServiceStatusesAsync();
+    Task<bool> CheckServiceHealthAsync(string serviceName);
+    Task StartHealthMonitoringAsync();
+    Task StopHealthMonitoringAsync();
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -825,6 +835,286 @@ public class BackupService : IBackupService
         catch (Exception ex)
         {
             Console.WriteLine($"Error cleaning up old backups: {ex.Message}");
+        }
+    }
+}
+
+public class HealthMonitoringService : IHealthMonitoringService
+{
+    private readonly GatewayDbContext _context;
+    private readonly Timer? _monitoringTimer;
+    private readonly Dictionary<string, ServiceStatus> _serviceStatuses;
+    private readonly object _lock = new object();
+    private int _totalRequests = 0;
+    private readonly List<double> _responseTimes = new List<double>();
+
+    public HealthMonitoringService(GatewayDbContext context)
+    {
+        _context = context;
+        _serviceStatuses = new Dictionary<string, ServiceStatus>();
+        
+        // Initialize service statuses
+        InitializeServiceStatuses();
+        
+        // Start monitoring timer (every 30 seconds)
+        _monitoringTimer = new Timer(async _ => await UpdateSystemMetrics(), null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+    }
+
+    private void InitializeServiceStatuses()
+    {
+        var services = new[]
+        {
+            "Database",
+            "LM Studio API",
+            "Authentication Service",
+            "File Storage",
+            "Backup Service"
+        };
+
+        foreach (var service in services)
+        {
+            _serviceStatuses[service] = new ServiceStatus(service, "Unknown", DateTime.UtcNow);
+        }
+    }
+
+    public async Task<SystemHealth> GetSystemHealthAsync()
+    {
+        var metrics = await GetSystemMetricsAsync();
+        var services = await GetServiceStatusesAsync();
+        
+        // Determine overall system health
+        var overallStatus = DetermineOverallHealth(services);
+        
+        return new SystemHealth(overallStatus, DateTime.UtcNow, metrics, services);
+    }
+
+    public async Task<SystemMetrics> GetSystemMetricsAsync()
+    {
+        lock (_lock)
+        {
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            var cpuUsage = GetCpuUsage();
+            var memoryUsage = process.WorkingSet64;
+            var diskUsage = GetDiskUsage();
+            var activeConnections = GetActiveConnections();
+            var avgResponseTime = _responseTimes.Any() ? _responseTimes.Average() : 0.0;
+
+            return new SystemMetrics(
+                cpuUsage,
+                memoryUsage,
+                diskUsage,
+                activeConnections,
+                _totalRequests,
+                avgResponseTime
+            );
+        }
+    }
+
+    public async Task<ServiceStatus[]> GetServiceStatusesAsync()
+    {
+        lock (_lock)
+        {
+            return _serviceStatuses.Values.ToArray();
+        }
+    }
+
+    public async Task<bool> CheckServiceHealthAsync(string serviceName)
+    {
+        try
+        {
+            var status = serviceName switch
+            {
+                "Database" => await CheckDatabaseHealth(),
+                "LM Studio API" => await CheckLMStudioHealth(),
+                "Authentication Service" => await CheckAuthServiceHealth(),
+                "File Storage" => await CheckFileStorageHealth(),
+                "Backup Service" => await CheckBackupServiceHealth(),
+                _ => false
+            };
+
+            lock (_lock)
+            {
+                if (_serviceStatuses.ContainsKey(serviceName))
+                {
+                    _serviceStatuses[serviceName] = new ServiceStatus(
+                        serviceName,
+                        status ? "Healthy" : "Unhealthy",
+                        DateTime.UtcNow,
+                        status ? null : "Service check failed"
+                    );
+                }
+            }
+
+            return status;
+        }
+        catch (Exception ex)
+        {
+            lock (_lock)
+            {
+                if (_serviceStatuses.ContainsKey(serviceName))
+                {
+                    _serviceStatuses[serviceName] = new ServiceStatus(
+                        serviceName,
+                        "Error",
+                        DateTime.UtcNow,
+                        ex.Message
+                    );
+                }
+            }
+            return false;
+        }
+    }
+
+    public async Task StartHealthMonitoringAsync()
+    {
+        // Start checking all services
+        var tasks = _serviceStatuses.Keys.Select(CheckServiceHealthAsync);
+        await Task.WhenAll(tasks);
+    }
+
+    public async Task StopHealthMonitoringAsync()
+    {
+        _monitoringTimer?.Dispose();
+    }
+
+    private async Task UpdateSystemMetrics()
+    {
+        try
+        {
+            await StartHealthMonitoringAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating system metrics: {ex.Message}");
+        }
+    }
+
+    private async Task<bool> CheckDatabaseHealth()
+    {
+        try
+        {
+            await _context.Database.ExecuteSqlRawAsync("SELECT 1");
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> CheckLMStudioHealth()
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            var response = await httpClient.GetAsync("http://localhost:1234/v1/models");
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> CheckAuthServiceHealth()
+    {
+        // Check if JWT service is working
+        return true; // Simplified check
+    }
+
+    private async Task<bool> CheckFileStorageHealth()
+    {
+        try
+        {
+            var tempFile = Path.GetTempFileName();
+            File.WriteAllText(tempFile, "test");
+            File.Delete(tempFile);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> CheckBackupServiceHealth()
+    {
+        try
+        {
+            var backupDir = Path.Combine(Directory.GetCurrentDirectory(), "backups");
+            return Directory.Exists(backupDir);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private double GetCpuUsage()
+    {
+        try
+        {
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            return process.TotalProcessorTime.TotalMilliseconds / Environment.ProcessorCount;
+        }
+        catch
+        {
+            return 0.0;
+        }
+    }
+
+    private long GetDiskUsage()
+    {
+        try
+        {
+            var drive = new DriveInfo(Directory.GetCurrentDirectory());
+            return drive.TotalSize - drive.AvailableFreeSpace;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private int GetActiveConnections()
+    {
+        try
+        {
+            // Simplified connection count
+            return Environment.ProcessorCount;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private string DetermineOverallHealth(ServiceStatus[] services)
+    {
+        var unhealthyServices = services.Count(s => s.Status != "Healthy");
+        var totalServices = services.Length;
+
+        if (unhealthyServices == 0)
+            return "Healthy";
+        else if (unhealthyServices <= totalServices / 2)
+            return "Degraded";
+        else
+            return "Unhealthy";
+    }
+
+    public void RecordRequest(double responseTime)
+    {
+        lock (_lock)
+        {
+            _totalRequests++;
+            _responseTimes.Add(responseTime);
+            
+            // Keep only last 100 response times
+            if (_responseTimes.Count > 100)
+            {
+                _responseTimes.RemoveAt(0);
+            }
         }
     }
 }

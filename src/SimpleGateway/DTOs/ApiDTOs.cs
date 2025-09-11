@@ -57,3 +57,9 @@ public record ApplyTemplateRequest(string TemplateId, string? CustomPrompt = nul
 public record BackupInfo(string Id, string Name, DateTime CreatedAt, long SizeBytes, string Description);
 public record CreateBackupRequest(string Name, string? Description = null);
 public record RestoreBackupRequest(string BackupId);
+
+// Health Monitoring DTOs
+public record SystemHealth(string Status, DateTime Timestamp, SystemMetrics Metrics, ServiceStatus[] Services);
+public record SystemMetrics(double CpuUsage, long MemoryUsage, long DiskUsage, int ActiveConnections, int TotalRequests, double ResponseTime);
+public record ServiceStatus(string Name, string Status, DateTime LastCheck, string? ErrorMessage = null);
+public record HealthCheckRequest(string ServiceName);
