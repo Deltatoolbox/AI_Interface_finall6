@@ -89,3 +89,9 @@ public record SsoConfigDto(string Provider, string ServerUrl, string BaseDn, str
 public record SsoUser(string Username, string Email, string DisplayName, string[] Groups, string Provider);
 public record SsoLoginRequest(string Username, string Password, string Provider = "ldap");
 public record SsoUserMapping(string LocalUserId, string SsoUsername, string Provider, DateTime CreatedAt);
+
+// User Profile DTOs
+public record UserProfile(string UserId, string Username, string Email, string? AvatarUrl, string? Bio, string? Location, string? Website, string? Timezone, string[] Interests, string[] Skills, DateTime CreatedAt, DateTime UpdatedAt);
+public record UpdateUserProfileRequest(string? AvatarUrl, string? Bio, string? Location, string? Website, string? Timezone, string[]? Interests, string[]? Skills);
+public record UserPreferencesDto(string UserId, string Theme, string Language, bool EmailNotifications, bool PushNotifications, bool DarkMode, string[] NotificationSettings, DateTime UpdatedAt);
+public record UpdateUserPreferencesRequest(string? Theme, string? Language, bool? EmailNotifications, bool? PushNotifications, bool? DarkMode, string[]? NotificationSettings);

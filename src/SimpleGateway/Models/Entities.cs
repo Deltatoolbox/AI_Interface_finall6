@@ -29,6 +29,14 @@ public class User
     public string? SsoProvider { get; set; }
     public string? SsoUsername { get; set; }
     
+    public string? AvatarUrl { get; set; }
+    public string? Bio { get; set; }
+    public string? Location { get; set; }
+    public string? Website { get; set; }
+    public string? Timezone { get; set; }
+    public string Interests { get; set; } = "[]"; // JSON array
+    public string Skills { get; set; } = "[]"; // JSON array
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
@@ -203,4 +211,24 @@ public class SsoConfig
     public bool IsEnabled { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class UserPreferences
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+    [MaxLength(50)]
+    public string Theme { get; set; } = "light";
+    [MaxLength(10)]
+    public string Language { get; set; } = "en";
+    public bool EmailNotifications { get; set; } = true;
+    public bool PushNotifications { get; set; } = true;
+    public bool DarkMode { get; set; } = false;
+    public string NotificationSettings { get; set; } = "[]"; // JSON array
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    
+    // Navigation Properties
+    public virtual User User { get; set; } = null!;
 }

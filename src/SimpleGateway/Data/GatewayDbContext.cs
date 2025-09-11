@@ -17,6 +17,7 @@ public class GatewayDbContext : DbContext
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<SsoConfig> SsoConfigs { get; set; }
+    public DbSet<UserPreferences> UserPreferences { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +35,11 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.SessionId).HasMaxLength(100);
             entity.Property(e => e.SsoProvider).HasMaxLength(50);
             entity.Property(e => e.SsoUsername).HasMaxLength(100);
+            entity.Property(e => e.AvatarUrl).HasMaxLength(500);
+            entity.Property(e => e.Bio).HasMaxLength(1000);
+            entity.Property(e => e.Location).HasMaxLength(100);
+            entity.Property(e => e.Website).HasMaxLength(200);
+            entity.Property(e => e.Timezone).HasMaxLength(50);
             
             entity.HasOne(e => e.UserRole)
                   .WithMany(e => e.Users)
@@ -150,6 +156,23 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.GroupSearchFilter).HasMaxLength(500);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
+        });
+
+        // UserPreferences Configuration
+        modelBuilder.Entity<UserPreferences>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId).IsUnique();
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.Theme).HasMaxLength(50).HasDefaultValue("light");
+            entity.Property(e => e.Language).HasMaxLength(10).HasDefaultValue("en");
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                  .WithOne()
+                  .HasForeignKey<UserPreferences>(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

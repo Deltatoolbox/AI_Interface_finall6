@@ -129,6 +129,17 @@ public interface ISsoService
     Task<SsoUserMapping[]> GetSsoUserMappingsAsync();
 }
 
+public interface IUserProfileService
+{
+    Task<UserProfile?> GetUserProfileAsync(string userId);
+    Task<UserProfile> UpdateUserProfileAsync(string userId, UpdateUserProfileRequest request);
+    Task<UserPreferencesDto?> GetUserPreferencesAsync(string userId);
+    Task<UserPreferencesDto> UpdateUserPreferencesAsync(string userId, UpdateUserPreferencesRequest request);
+    Task<UserPreferencesDto> CreateDefaultPreferencesAsync(string userId);
+    Task<UserProfile[]> GetAllUserProfilesAsync();
+    Task<bool> DeleteUserProfileAsync(string userId);
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -2126,5 +2137,225 @@ public class SsoService : ISsoService
             .ToArrayAsync();
 
         return mappings;
+    }
+}
+
+public class UserProfileService : IUserProfileService
+{
+    private readonly GatewayDbContext _context;
+
+    public UserProfileService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<UserProfile?> GetUserProfileAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return null;
+
+        var interests = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Interests) ?? Array.Empty<string>();
+        var skills = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Skills) ?? Array.Empty<string>();
+
+        return new UserProfile(
+            user.Id,
+            user.Username,
+            user.Email,
+            user.AvatarUrl,
+            user.Bio,
+            user.Location,
+            user.Website,
+            user.Timezone,
+            interests,
+            skills,
+            user.CreatedAt,
+            user.UpdatedAt
+        );
+    }
+
+    public async Task<UserProfile> UpdateUserProfileAsync(string userId, UpdateUserProfileRequest request)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) throw new ArgumentException("User not found");
+
+        if (request.AvatarUrl != null) user.AvatarUrl = request.AvatarUrl;
+        if (request.Bio != null) user.Bio = request.Bio;
+        if (request.Location != null) user.Location = request.Location;
+        if (request.Website != null) user.Website = request.Website;
+        if (request.Timezone != null) user.Timezone = request.Timezone;
+        if (request.Interests != null) user.Interests = System.Text.Json.JsonSerializer.Serialize(request.Interests);
+        if (request.Skills != null) user.Skills = System.Text.Json.JsonSerializer.Serialize(request.Skills);
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var interests = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Interests) ?? Array.Empty<string>();
+        var skills = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Skills) ?? Array.Empty<string>();
+
+        return new UserProfile(
+            user.Id,
+            user.Username,
+            user.Email,
+            user.AvatarUrl,
+            user.Bio,
+            user.Location,
+            user.Website,
+            user.Timezone,
+            interests,
+            skills,
+            user.CreatedAt,
+            user.UpdatedAt
+        );
+    }
+
+    public async Task<UserPreferencesDto?> GetUserPreferencesAsync(string userId)
+    {
+        var preferences = await _context.UserPreferences
+            .FirstOrDefaultAsync(p => p.UserId == userId);
+
+        if (preferences == null) return null;
+
+        var notificationSettings = System.Text.Json.JsonSerializer.Deserialize<string[]>(preferences.NotificationSettings) ?? Array.Empty<string>();
+
+        return new UserPreferencesDto(
+            preferences.UserId,
+            preferences.Theme,
+            preferences.Language,
+            preferences.EmailNotifications,
+            preferences.PushNotifications,
+            preferences.DarkMode,
+            notificationSettings,
+            preferences.UpdatedAt
+        );
+    }
+
+    public async Task<UserPreferencesDto> UpdateUserPreferencesAsync(string userId, UpdateUserPreferencesRequest request)
+    {
+        var preferences = await _context.UserPreferences
+            .FirstOrDefaultAsync(p => p.UserId == userId);
+
+        if (preferences == null)
+        {
+            var defaultPrefs = await CreateDefaultPreferencesAsync(userId);
+            preferences = await _context.UserPreferences
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+        }
+
+        if (request.Theme != null) preferences.Theme = request.Theme;
+        if (request.Language != null) preferences.Language = request.Language;
+        if (request.EmailNotifications.HasValue) preferences.EmailNotifications = request.EmailNotifications.Value;
+        if (request.PushNotifications.HasValue) preferences.PushNotifications = request.PushNotifications.Value;
+        if (request.DarkMode.HasValue) preferences.DarkMode = request.DarkMode.Value;
+        if (request.NotificationSettings != null) preferences.NotificationSettings = System.Text.Json.JsonSerializer.Serialize(request.NotificationSettings);
+
+        preferences.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var notificationSettings = System.Text.Json.JsonSerializer.Deserialize<string[]>(preferences.NotificationSettings) ?? Array.Empty<string>();
+
+        return new UserPreferencesDto(
+            preferences.UserId,
+            preferences.Theme,
+            preferences.Language,
+            preferences.EmailNotifications,
+            preferences.PushNotifications,
+            preferences.DarkMode,
+            notificationSettings,
+            preferences.UpdatedAt
+        );
+    }
+
+    public async Task<UserPreferencesDto> CreateDefaultPreferencesAsync(string userId)
+    {
+        var preferences = new Models.UserPreferences
+        {
+            UserId = userId,
+            Theme = "light",
+            Language = "en",
+            EmailNotifications = true,
+            PushNotifications = true,
+            DarkMode = false,
+            NotificationSettings = "[]",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.UserPreferences.Add(preferences);
+        await _context.SaveChangesAsync();
+
+        return new UserPreferencesDto(
+            preferences.UserId,
+            preferences.Theme,
+            preferences.Language,
+            preferences.EmailNotifications,
+            preferences.PushNotifications,
+            preferences.DarkMode,
+            Array.Empty<string>(),
+            preferences.UpdatedAt
+        );
+    }
+
+    public async Task<UserProfile[]> GetAllUserProfilesAsync()
+    {
+        var users = await _context.Users
+            .OrderBy(u => u.Username)
+            .ToArrayAsync();
+
+        var profiles = new List<UserProfile>();
+        foreach (var user in users)
+        {
+            var interests = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Interests) ?? Array.Empty<string>();
+            var skills = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Skills) ?? Array.Empty<string>();
+
+            profiles.Add(new UserProfile(
+                user.Id,
+                user.Username,
+                user.Email,
+                user.AvatarUrl,
+                user.Bio,
+                user.Location,
+                user.Website,
+                user.Timezone,
+                interests,
+                skills,
+                user.CreatedAt,
+                user.UpdatedAt
+            ));
+        }
+
+        return profiles.ToArray();
+    }
+
+    public async Task<bool> DeleteUserProfileAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return false;
+
+        // Reset profile fields to defaults
+        user.AvatarUrl = null;
+        user.Bio = null;
+        user.Location = null;
+        user.Website = null;
+        user.Timezone = null;
+        user.Interests = "[]";
+        user.Skills = "[]";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        // Delete preferences
+        var preferences = await _context.UserPreferences
+            .FirstOrDefaultAsync(p => p.UserId == userId);
+        if (preferences != null)
+        {
+            _context.UserPreferences.Remove(preferences);
+        }
+
+        await _context.SaveChangesAsync();
+        return true;
     }
 }
