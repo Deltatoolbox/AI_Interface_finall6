@@ -10,6 +10,7 @@ import AdminPage from './pages/AdminPage'
 import UserManagementPage from './pages/UserManagementPage'
 import DebugPage from './pages/DebugPage'
 import SearchPage from './pages/SearchPage'
+import SharedConversationPage from './pages/SharedConversationPage'
 
 function App() {
   return (
@@ -36,14 +37,18 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/search" 
-            element={
-              <ProtectedRoute>
-                <SearchPage />
-              </ProtectedRoute>
-            } 
-          />
+        <Route 
+          path="/search" 
+          element={
+            <ProtectedRoute>
+              <SearchPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/shared/:shareId" 
+          element={<SharedConversationPage />} 
+        />
           <Route 
             path="/admin" 
             element={

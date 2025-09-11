@@ -1,5 +1,6 @@
-import { Clock, Edit2, Check, X } from 'lucide-react'
+import { Clock, Edit2, Check, X, Share2 } from 'lucide-react'
 import { useState } from 'react'
+import { ShareModal } from './ShareModal'
 
 interface Conversation {
   id: string
@@ -25,6 +26,8 @@ export function ConversationList({
 }: ConversationListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [selectedConversationForShare, setSelectedConversationForShare] = useState<Conversation | null>(null)
 
   const formatDate = (date: Date) => {
     const now = new Date()
@@ -57,6 +60,16 @@ export function ConversationList({
   const handleEditCancel = () => {
     setEditingId(null)
     setEditTitle('')
+  }
+
+  const handleShare = (conversation: Conversation) => {
+    setSelectedConversationForShare(conversation)
+    setShareModalOpen(true)
+  }
+
+  const handleShareCreated = (share: any) => {
+    console.log('Share created:', share)
+    // Could show a toast notification here
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -136,22 +149,47 @@ export function ConversationList({
                       </button>
                     </>
                   ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleEditStart(conversation)
-                      }}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
-                      title="Rename"
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleShare(conversation)
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                        title="Share"
+                      >
+                        <Share2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditStart(conversation)
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                        title="Rename"
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
             </div>
           ))}
         </div>
+      )}
+      
+      {selectedConversationForShare && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => {
+            setShareModalOpen(false)
+            setSelectedConversationForShare(null)
+          }}
+          conversationId={selectedConversationForShare.id}
+          conversationTitle={selectedConversationForShare.title}
+          onShareCreated={handleShareCreated}
+        />
       )}
     </div>
   )

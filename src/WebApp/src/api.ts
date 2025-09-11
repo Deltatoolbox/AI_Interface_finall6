@@ -160,5 +160,47 @@ export const api = {
     })
     if (!response.ok) throw new Error('Failed to search messages')
     return response.json()
+  },
+
+  // Chat Sharing API
+  async createShare(conversationId: string, password?: string, expiresAt?: Date) {
+    const response = await fetch(`${API_BASE_URL}/api/shares`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ conversationId, password, expiresAt }),
+    })
+    if (!response.ok) throw new Error('Failed to create share')
+    return response.json()
+  },
+
+  async getSharedConversation(shareId: string, password?: string) {
+    const url = new URL(`${API_BASE_URL}/api/shares/${shareId}`)
+    if (password) url.searchParams.set('password', password)
+    
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get shared conversation')
+    return response.json()
+  },
+
+  async revokeShare(shareId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/shares/${shareId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to revoke share')
+    return response.json()
+  },
+
+  async getUserShares() {
+    const response = await fetch(`${API_BASE_URL}/api/shares`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get user shares')
+    return response.json()
   }
 }

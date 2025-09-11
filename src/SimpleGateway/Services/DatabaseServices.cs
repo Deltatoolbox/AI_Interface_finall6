@@ -34,6 +34,14 @@ public interface IConversationService
     Task<SearchResult[]> SearchMessagesAsync(string userId, string query, int? limit = null, int? offset = null);
 }
 
+public interface IShareService
+{
+    Task<ShareResponse> CreateShareAsync(string userId, string conversationId, string? password = null, DateTime? expiresAt = null);
+    Task<SharedConversationResponse?> GetSharedConversationAsync(string shareId, string? password = null);
+    Task<bool> RevokeShareAsync(string userId, string shareId);
+    Task<ShareResponse[]> GetUserSharesAsync(string userId);
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -329,6 +337,116 @@ public class ConversationService : IConversationService
         }
         
         return result.ToArray();
+    }
+}
+
+public class ShareService : IShareService
+{
+    private readonly GatewayDbContext _context;
+    private readonly IConversationService _conversationService;
+
+    public ShareService(GatewayDbContext context, IConversationService conversationService)
+    {
+        _context = context;
+        _conversationService = conversationService;
+    }
+
+    public async Task<ShareResponse> CreateShareAsync(string userId, string conversationId, string? password = null, DateTime? expiresAt = null)
+    {
+        // Verify user owns the conversation
+        var conversation = await _context.Conversations
+            .FirstOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId);
+        
+        if (conversation == null)
+            throw new UnauthorizedAccessException("Conversation not found or access denied");
+
+        var share = new Share
+        {
+            ConversationId = conversationId,
+            SharedByUserId = userId,
+            PasswordHash = password != null ? BCrypt.Net.BCrypt.HashPassword(password) : null,
+            ExpiresAt = expiresAt,
+            IsActive = true
+        };
+
+        _context.Shares.Add(share);
+        await _context.SaveChangesAsync();
+
+        var shareUrl = $"http://localhost:5173/shared/{share.Id}";
+        
+        return new ShareResponse(
+            share.Id,
+            shareUrl,
+            share.CreatedAt,
+            share.ExpiresAt,
+            !string.IsNullOrEmpty(share.PasswordHash)
+        );
+    }
+
+    public async Task<SharedConversationResponse?> GetSharedConversationAsync(string shareId, string? password = null)
+    {
+        var share = await _context.Shares
+            .Include(s => s.Conversation)
+            .Include(s => s.SharedByUser)
+            .FirstOrDefaultAsync(s => s.Id == shareId && s.IsActive);
+
+        if (share == null)
+            return null;
+
+        // Check if expired
+        if (share.ExpiresAt.HasValue && share.ExpiresAt.Value < DateTime.UtcNow)
+            return null;
+
+        // Check password if required
+        if (!string.IsNullOrEmpty(share.PasswordHash))
+        {
+            if (string.IsNullOrEmpty(password) || !BCrypt.Net.BCrypt.Verify(password, share.PasswordHash))
+                return null;
+        }
+
+        // Get conversation with messages
+        var conversation = await _conversationService.GetConversationWithMessagesAsync(share.ConversationId, share.SharedByUserId);
+        if (conversation == null)
+            return null;
+
+        return new SharedConversationResponse(
+            conversation.Id,
+            conversation.Title,
+            conversation.CreatedAt,
+            conversation.UpdatedAt,
+            conversation.Messages,
+            share.SharedByUser.Username,
+            share.CreatedAt
+        );
+    }
+
+    public async Task<bool> RevokeShareAsync(string userId, string shareId)
+    {
+        var share = await _context.Shares
+            .FirstOrDefaultAsync(s => s.Id == shareId && s.SharedByUserId == userId);
+
+        if (share == null)
+            return false;
+
+        share.IsActive = false;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<ShareResponse[]> GetUserSharesAsync(string userId)
+    {
+        var shares = await _context.Shares
+            .Where(s => s.SharedByUserId == userId && s.IsActive)
+            .OrderByDescending(s => s.CreatedAt)
+            .ToArrayAsync();
+
+        return shares.Select(s => new ShareResponse(
+            s.Id,
+            $"http://localhost:5173/shared/{s.Id}",
+            s.CreatedAt,
+            s.ExpiresAt,
+            !string.IsNullOrEmpty(s.PasswordHash)
+        )).ToArray();
     }
 }
 

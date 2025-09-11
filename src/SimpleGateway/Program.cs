@@ -48,6 +48,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
+builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -686,6 +687,85 @@ app.MapPost("/api/search", async (SearchRequest request, HttpContext context, IC
     {
         Console.WriteLine($"Error searching messages: {ex.Message}");
         return Results.Problem("Failed to search messages");
+    }
+});
+
+// Chat Sharing Endpoints
+app.MapPost("/api/shares", async (CreateShareRequest request, HttpContext context, IUserService userService, IShareService shareService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var share = await shareService.CreateShareAsync(user.Id, request.ConversationId, request.Password, request.ExpiresAt);
+        return Results.Ok(share);
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return Results.Forbid();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error creating share: {ex.Message}");
+        return Results.Problem("Failed to create share");
+    }
+});
+
+app.MapGet("/api/shares/{shareId}", async (string shareId, string? password, IShareService shareService) =>
+{
+    try
+    {
+        var conversation = await shareService.GetSharedConversationAsync(shareId, password);
+        if (conversation == null)
+            return Results.NotFound("Share not found or expired");
+
+        return Results.Ok(conversation);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error accessing shared conversation: {ex.Message}");
+        return Results.Problem("Failed to access shared conversation");
+    }
+});
+
+app.MapDelete("/api/shares/{shareId}", async (string shareId, HttpContext context, IUserService userService, IShareService shareService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var success = await shareService.RevokeShareAsync(user.Id, shareId);
+        if (!success)
+            return Results.NotFound("Share not found");
+
+        return Results.Ok(new { message = "Share revoked successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error revoking share: {ex.Message}");
+        return Results.Problem("Failed to revoke share");
+    }
+});
+
+app.MapGet("/api/shares", async (HttpContext context, IUserService userService, IShareService shareService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var shares = await shareService.GetUserSharesAsync(user.Id);
+        return Results.Ok(shares);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting user shares: {ex.Message}");
+        return Results.Problem("Failed to get user shares");
     }
 });
 

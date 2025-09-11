@@ -70,3 +70,24 @@ public class Message
     // Navigation Properties
     public virtual Conversation Conversation { get; set; } = null!;
 }
+
+public class Share
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    
+    [Required]
+    public string ConversationId { get; set; } = string.Empty;
+    
+    [Required]
+    public string SharedByUserId { get; set; } = string.Empty;
+    
+    public string? PasswordHash { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    
+    // Navigation Properties
+    public virtual Conversation Conversation { get; set; } = null!;
+    public virtual User SharedByUser { get; set; } = null!;
+}

@@ -41,3 +41,9 @@ public record ConversationImportRequest(ConversationExportData[] Conversations);
 public record SearchRequest(string Query, int? Limit = null, int? Offset = null);
 
 public record SearchResult(string ConversationId, string ConversationTitle, string MessageId, string Role, string Content, DateTime CreatedAt, string[] HighlightedContent);
+
+// Chat Sharing DTOs
+public record CreateShareRequest(string ConversationId, string? Password = null, DateTime? ExpiresAt = null);
+public record ShareResponse(string ShareId, string ShareUrl, DateTime CreatedAt, DateTime? ExpiresAt, bool IsPasswordProtected);
+public record SharedConversationResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, MessageResponse[] Messages, string SharedBy, DateTime SharedAt);
+public record ShareAccessRequest(string ShareId, string? Password = null);

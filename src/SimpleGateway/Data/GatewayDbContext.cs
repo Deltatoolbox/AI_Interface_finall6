@@ -12,6 +12,7 @@ public class GatewayDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
+    public DbSet<Share> Shares { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +53,24 @@ public class GatewayDbContext : DbContext
             entity.HasOne(e => e.Conversation)
                   .WithMany(c => c.Messages)
                   .HasForeignKey(e => e.ConversationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Share Configuration
+        modelBuilder.Entity<Share>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ConversationId).IsRequired();
+            entity.Property(e => e.SharedByUserId).IsRequired();
+            
+            entity.HasOne(e => e.Conversation)
+                  .WithMany()
+                  .HasForeignKey(e => e.ConversationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+                  
+            entity.HasOne(e => e.SharedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.SharedByUserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }
