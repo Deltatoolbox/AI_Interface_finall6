@@ -69,7 +69,6 @@ export default function DebugPage() {
         '/health'
       ]
       
-      let workingEndpoint = null
       let lastError = null
       
       for (const endpoint of endpoints) {
@@ -77,7 +76,7 @@ export default function DebugPage() {
           const response = await fetch(endpoint)
           
           if (response.ok) {
-            workingEndpoint = endpoint
+            // workingEndpoint = endpoint
             const contentType = response.headers.get('content-type')
             
             if (contentType && contentType.includes('application/json')) {

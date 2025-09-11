@@ -128,5 +128,37 @@ export const api = {
     })
     if (!response.ok) throw new Error('Failed to update conversation title')
     return response.json()
+  },
+
+  // Export/Import APIs
+  async exportConversations() {
+    const response = await fetch(`${API_BASE_URL}/api/conversations/export`, {
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to export conversations')
+    return response.json()
+  },
+
+  async importConversations(conversations: any[]) {
+    const response = await fetch(`${API_BASE_URL}/api/conversations/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ conversations }),
+    })
+    if (!response.ok) throw new Error('Failed to import conversations')
+    return response.json()
+  },
+
+  // Search API
+  async searchMessages(query: string, limit?: number, offset?: number) {
+    const response = await fetch(`${API_BASE_URL}/api/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ query, limit, offset }),
+    })
+    if (!response.ok) throw new Error('Failed to search messages')
+    return response.json()
   }
 }

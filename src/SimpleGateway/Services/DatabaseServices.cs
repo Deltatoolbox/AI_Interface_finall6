@@ -23,10 +23,15 @@ public interface IUserService
 public interface IConversationService
 {
     Task<ConversationResponse[]> GetConversationsByUserIdAsync(string userId);
-    Task<ConversationResponse> CreateConversationAsync(string userId, string title);
+    Task<ConversationResponse[]> GetAllConversationsForUserAsync(string userId);
+    Task<ConversationResponse> CreateConversationAsync(string userId, string title, string model = "", string category = "General");
+    Task<ConversationResponse> CreateConversationAsync(Conversation conversation);
     Task<ConversationWithMessagesResponse?> GetConversationWithMessagesAsync(string conversationId, string userId);
+    Task<MessageResponse[]> GetMessagesByConversationIdAsync(string conversationId);
     Task<ConversationResponse?> UpdateConversationTitleAsync(string conversationId, string userId, string newTitle);
     Task<bool> DeleteAllConversationsForUserAsync(string userId);
+    Task AddMessageAsync(Message message);
+    Task<SearchResult[]> SearchMessagesAsync(string userId, string query, int? limit = null, int? offset = null);
 }
 
 public interface IMessageService
@@ -161,18 +166,20 @@ public class ConversationService : IConversationService
         var conversations = await _context.Conversations
             .Where(c => c.UserId == userId)
             .OrderByDescending(c => c.UpdatedAt)
-            .Select(c => new ConversationResponse(c.Id, c.Title, c.CreatedAt, c.UpdatedAt))
+            .Select(c => new ConversationResponse(c.Id, c.Title, c.CreatedAt, c.UpdatedAt, c.Model, c.Category))
             .ToArrayAsync();
 
         return conversations;
     }
 
-    public async Task<ConversationResponse> CreateConversationAsync(string userId, string title)
+    public async Task<ConversationResponse> CreateConversationAsync(string userId, string title, string model = "", string category = "General")
     {
         var conversation = new Conversation
         {
             Title = title,
             UserId = userId,
+            Model = model,
+            Category = category,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -180,7 +187,7 @@ public class ConversationService : IConversationService
         _context.Conversations.Add(conversation);
         await _context.SaveChangesAsync();
 
-        return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt);
+        return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt, conversation.Model, conversation.Category);
     }
 
     public async Task<ConversationWithMessagesResponse?> GetConversationWithMessagesAsync(string conversationId, string userId)
@@ -200,6 +207,8 @@ public class ConversationService : IConversationService
             conversation.Title, 
             conversation.CreatedAt, 
             conversation.UpdatedAt, 
+            conversation.Model,
+            conversation.Category,
             messages);
     }
 
@@ -216,7 +225,7 @@ public class ConversationService : IConversationService
 
         await _context.SaveChangesAsync();
 
-        return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt);
+        return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt, conversation.Model, conversation.Category);
     }
 
     public async Task<bool> DeleteAllConversationsForUserAsync(string userId)
@@ -240,6 +249,86 @@ public class ConversationService : IConversationService
         
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<ConversationResponse[]> GetAllConversationsForUserAsync(string userId)
+    {
+        return await GetConversationsByUserIdAsync(userId);
+    }
+
+    public async Task<ConversationResponse> CreateConversationAsync(Conversation conversation)
+    {
+        _context.Conversations.Add(conversation);
+        await _context.SaveChangesAsync();
+        return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt, conversation.Model, conversation.Category);
+    }
+
+    public async Task<MessageResponse[]> GetMessagesByConversationIdAsync(string conversationId)
+    {
+        var messages = await _context.Messages
+            .Where(m => m.ConversationId == conversationId)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new MessageResponse(m.Id, m.Role, m.Content, m.CreatedAt))
+            .ToArrayAsync();
+
+        return messages;
+    }
+
+    public async Task AddMessageAsync(Message message)
+    {
+        _context.Messages.Add(message);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<SearchResult[]> SearchMessagesAsync(string userId, string query, int? limit = null, int? offset = null)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return Array.Empty<SearchResult>();
+
+        var baseQuery = _context.Messages
+            .Where(m => m.Conversation.UserId == userId && m.Content.Contains(query))
+            .Include(m => m.Conversation)
+            .OrderByDescending(m => m.CreatedAt);
+
+        var messages = await baseQuery
+            .Skip(offset ?? 0)
+            .Take(limit ?? 50)
+            .ToArrayAsync();
+
+        return messages.Select(m => 
+        {
+            // Simple highlighting - wrap matching text in <mark> tags
+            var highlightedContent = HighlightText(m.Content, query);
+            
+            return new SearchResult(
+                m.ConversationId,
+                m.Conversation.Title,
+                m.Id,
+                m.Role,
+                m.Content,
+                m.CreatedAt,
+                highlightedContent
+            );
+        }).ToArray();
+    }
+
+    private static string[] HighlightText(string content, string query)
+    {
+        if (string.IsNullOrEmpty(query))
+            return new[] { content };
+
+        var parts = content.Split(new[] { query }, StringSplitOptions.None);
+        var result = new List<string>();
+        
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (i > 0)
+                result.Add($"<mark>{query}</mark>");
+            if (!string.IsNullOrEmpty(parts[i]))
+                result.Add(parts[i]);
+        }
+        
+        return result.ToArray();
     }
 }
 

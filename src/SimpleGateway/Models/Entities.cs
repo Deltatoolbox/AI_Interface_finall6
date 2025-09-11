@@ -37,6 +37,12 @@ public class Conversation
     [Required]
     public string UserId { get; set; } = string.Empty;
     
+    [MaxLength(100)]
+    public string Model { get; set; } = string.Empty; // LM Studio model ID
+    
+    [MaxLength(50)]
+    public string Category { get; set; } = "General"; // Conversation category/tag
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     

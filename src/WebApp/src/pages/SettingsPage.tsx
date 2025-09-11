@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { useNavigate } from 'react-router-dom'
 import { Settings, User, Shield, LogOut, ArrowLeft, Palette, Database, Key, Trash2, Lock, AlertTriangle } from 'lucide-react'
+import { api } from '../api'
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
@@ -94,6 +95,71 @@ export default function SettingsPage() {
       setError('An error occurred while changing password')
     } finally {
       setIsChangingPassword(false)
+    }
+  }
+
+  // Export/Import Handlers
+  const handleExportConversations = async () => {
+    try {
+      setError('')
+      const conversations = await api.exportConversations()
+      
+      // Create a blob with the JSON data
+      const jsonString = JSON.stringify(conversations, null, 2)
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      
+      // Create download link
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `conversations-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      
+      setSuccess(`Successfully exported ${conversations.length} conversations`)
+    } catch (err) {
+      setError('Failed to export conversations')
+      console.error('Export error:', err)
+    }
+  }
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      setError('')
+      const text = await file.text()
+      const conversations = JSON.parse(text)
+      
+      if (!Array.isArray(conversations)) {
+        setError('Invalid file format. Please select a valid JSON export file.')
+        return
+      }
+
+      const result = await api.importConversations(conversations)
+      
+      if (result.errors && result.errors.length > 0) {
+        setError(`Import completed with ${result.errors.length} errors. Check console for details.`)
+        console.error('Import errors:', result.errors)
+      } else {
+        setSuccess(`Successfully imported ${result.importedCount} conversations`)
+      }
+      
+      // Clear the file input
+      event.target.value = ''
+      
+      // Refresh the page to show imported conversations
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+      
+    } catch (err) {
+      setError('Failed to import conversations. Please check the file format.')
+      console.error('Import error:', err)
+      event.target.value = ''
     }
   }
 
@@ -317,6 +383,50 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
+                      {/* Export/Import Section */}
+                      <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
+                        <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+                          <Database className="h-5 w-5 mr-2 text-green-600" />
+                          Data Export/Import
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Export Conversations</h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">Download all your conversations as JSON file</p>
+                            </div>
+                            <button
+                              onClick={handleExportConversations}
+                              className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white text-sm font-medium rounded-md hover:bg-green-700 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            >
+                              Export
+                            </button>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Import Conversations</h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">Upload and restore conversations from JSON file</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="file"
+                                accept=".json"
+                                onChange={handleImportFile}
+                                className="hidden"
+                                id="import-file"
+                              />
+                              <label
+                                htmlFor="import-file"
+                                className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              >
+                                Choose File
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Data Management Section */}
                       <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
                         <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center">
@@ -339,38 +449,6 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      {/* Privacy Settings Section */}
-                      <div>
-                        <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center">
-                          <Shield className="h-5 w-5 mr-2 text-green-600" />
-                          Privacy Preferences
-                        </h3>
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Chat History</h4>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">Save chat conversations (always enabled)</p>
-                            </div>
-                            <input type="checkbox" defaultChecked disabled className="h-4 w-4 text-blue-600 rounded" />
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Data Collection</h4>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">Allow collection of usage data for improvements</p>
-                            </div>
-                            <input type="checkbox" className="h-4 w-4 text-blue-600 rounded" />
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Analytics</h4>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">Share anonymous usage statistics</p>
-                            </div>
-                            <input type="checkbox" className="h-4 w-4 text-blue-600 rounded" />
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}

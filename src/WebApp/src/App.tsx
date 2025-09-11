@@ -9,6 +9,7 @@ import SettingsPage from './pages/SettingsPage'
 import AdminPage from './pages/AdminPage'
 import UserManagementPage from './pages/UserManagementPage'
 import DebugPage from './pages/DebugPage'
+import SearchPage from './pages/SearchPage'
 
 function App() {
   return (
@@ -32,6 +33,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/search" 
+            element={
+              <ProtectedRoute>
+                <SearchPage />
               </ProtectedRoute>
             } 
           />

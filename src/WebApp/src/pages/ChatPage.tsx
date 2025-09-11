@@ -1,18 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { LogOut, Settings, MessageSquare, Plus } from 'lucide-react'
+import { LogOut, Settings, MessageSquare, Plus, Search } from 'lucide-react'
 import { ConversationList } from '../components/ConversationList'
 import { MessageList } from '../components/MessageList'
 import { MessageInput } from '../components/MessageInput'
 import { ModelSelector } from '../components/ModelSelector'
 import { api } from '../api'
 
+interface UploadedFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  url?: string
+  content?: string
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: Date
+  files?: UploadedFile[]
 }
 
 interface Conversation {
@@ -20,6 +30,8 @@ interface Conversation {
   title: string
   createdAt: Date
   updatedAt: Date
+  model: string
+  category: string
 }
 
 interface Model {
@@ -111,16 +123,20 @@ export default function ChatPage() {
     }
   }
 
-  const createConversation = async (title: string) => {
+  const createConversation = async (title: string, model?: string, category?: string) => {
     try {
-      console.log('Creating conversation with title:', title)
+      console.log('Creating conversation with title:', title, 'model:', model, 'category:', category)
       const response = await fetch('http://localhost:5058/api/conversations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ 
+          title, 
+          model: model || selectedModel,
+          category: category || 'General'
+        }),
       })
 
       console.log('Response status:', response.status)
@@ -145,20 +161,35 @@ export default function ChatPage() {
     }
   }
 
-  const sendMessage = async (content: string) => {
-    if (!selectedModel || !content.trim()) return
+  const sendMessage = async (content: string, files?: UploadedFile[]) => {
+    if (!selectedModel || (!content.trim() && !files?.length)) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
       content,
-      timestamp: new Date()
+      timestamp: new Date(),
+      files
     }
 
     setMessages(prev => [...prev, userMessage])
     setIsStreaming(true)
 
     try {
+      // Prepare message content with file information
+      if (files && files.length > 0) {
+        const fileInfo = files.map(file => {
+          if (file.type.startsWith('image/')) {
+            return `[Image: ${file.name}]`
+          } else if (file.content) {
+            return `[File: ${file.name}]\n${file.content}`
+          } else {
+            return `[File: ${file.name}]`
+          }
+        }).join('\n\n')
+        content = content ? `${content}\n\n${fileInfo}` : fileInfo
+      }
+
       const response = await fetch('http://localhost:5058/api/chat', {
         method: 'POST',
         headers: {
@@ -169,7 +200,7 @@ export default function ChatPage() {
           model: selectedModel,
           messages: [...messages, userMessage].map(m => ({
             role: m.role,
-            content: m.content
+            content: m.files ? `${m.content}\n\n${m.files.map(f => f.type.startsWith('image/') ? `[Image: ${f.name}]` : `[File: ${f.name}]`).join('\n')}` : m.content
           })),
           conversationId: currentConversation?.id
         })
@@ -265,6 +296,14 @@ export default function ChatPage() {
             >
               <Settings className="h-5 w-5" />
               <span>Settings</span>
+            </button>
+            
+            <button
+              onClick={() => navigate('/search')}
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              <Search className="h-5 w-5" />
+              <span>Search</span>
             </button>
             
             <button

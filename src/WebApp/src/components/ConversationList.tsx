@@ -6,6 +6,8 @@ interface Conversation {
   title: string
   createdAt: Date
   updatedAt: Date
+  model: string
+  category: string
 }
 
 interface ConversationListProps {
@@ -99,6 +101,16 @@ export function ConversationList({
                     <p className="text-sm font-medium truncate">
                       {conversation.title}
                     </p>
+                  )}
+                  {conversation.model && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      {conversation.model.split('/').pop()}
+                    </div>
+                  )}
+                  {conversation.category && conversation.category !== 'General' && (
+                    <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      #{conversation.category}
+                    </div>
                   )}
                   <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
                     <Clock className="h-3 w-3 mr-1" />

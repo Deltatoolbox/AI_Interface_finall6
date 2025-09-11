@@ -247,7 +247,7 @@ app.MapPost("/api/conversations", async (CreateConversationRequest request, Http
     if (user == null)
         return Results.Unauthorized();
     
-    var conversation = await conversationService.CreateConversationAsync(user.Id, request.Title);
+    var conversation = await conversationService.CreateConversationAsync(user.Id, request.Title, request.Model, request.Category);
     Console.WriteLine($"Conversation erstellt: {conversation.Id} - {request.Title}");
     
     return Results.Ok(conversation);
@@ -281,7 +281,7 @@ app.MapPut("/api/conversations/{id}", async (string id, UpdateConversationReques
     return Results.Ok(conversation);
 });
 
-app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IJwtTokenService jwtService) =>
+app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IConversationService conversationService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
@@ -291,9 +291,20 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserS
     {
         using var httpClient = new HttpClient();
         
+        // Bestimme das zu verwendende Model
+        string modelToUse = request.Model;
+        if (!string.IsNullOrEmpty(request.ConversationId))
+        {
+            var conversation = await conversationService.GetConversationWithMessagesAsync(request.ConversationId, user.Id);
+            if (conversation != null && !string.IsNullOrEmpty(conversation.Model))
+            {
+                modelToUse = conversation.Model;
+            }
+        }
+        
         var lmStudioRequest = new
         {
-            model = request.Model,
+            model = modelToUse,
             messages = request.Messages.Select(m => new { role = m.Role, content = m.Content }),
             max_tokens = 1000,
             temperature = 0.7
@@ -555,6 +566,127 @@ app.MapPost("/api/admin/reset-password", async (ResetPasswordRequest request, Ht
         return Results.BadRequest(new { message = "Failed to reset password" });
 
     return Results.Ok(new { message = $"Password reset successfully for user {request.Username}" });
+});
+
+// Export/Import API Endpoints
+app.MapGet("/api/conversations/export", async (HttpContext context, IConversationService conversationService, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var conversations = await conversationService.GetAllConversationsForUserAsync(user.Id);
+        var exportData = new List<ConversationExportData>();
+
+        foreach (var conv in conversations)
+        {
+            var messages = await conversationService.GetMessagesByConversationIdAsync(conv.Id);
+            var messageExports = messages.Select(m => new MessageExportData(m.Role, m.Content, m.CreatedAt)).ToArray();
+            
+            exportData.Add(new ConversationExportData(
+                conv.Id,
+                conv.Title,
+                conv.CreatedAt,
+                conv.UpdatedAt,
+                messageExports
+            ));
+        }
+
+        return Results.Ok(exportData);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error exporting conversations: {ex.Message}");
+        return Results.Problem("Failed to export conversations");
+    }
+});
+
+app.MapPost("/api/conversations/import", async (ConversationImportRequest request, HttpContext context, IConversationService conversationService, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var importedCount = 0;
+        var errors = new List<string>();
+
+        foreach (var convData in request.Conversations)
+        {
+            try
+            {
+                // Create new conversation with new ID
+                var newConversationId = Guid.NewGuid().ToString();
+                var conversation = new Conversation
+                {
+                    Id = newConversationId,
+                    Title = convData.Title,
+                    UserId = user.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await conversationService.CreateConversationAsync(conversation);
+
+                // Add messages
+                foreach (var msgData in convData.Messages)
+                {
+                    var message = new Message
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        ConversationId = newConversationId,
+                        Role = msgData.Role,
+                        Content = msgData.Content,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await conversationService.AddMessageAsync(message);
+                }
+
+                importedCount++;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Failed to import conversation '{convData.Title}': {ex.Message}");
+            }
+        }
+
+        var result = new
+        {
+            importedCount,
+            totalCount = request.Conversations.Length,
+            errors = errors.ToArray()
+        };
+
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error importing conversations: {ex.Message}");
+        return Results.Problem("Failed to import conversations");
+    }
+});
+
+// Search API Endpoint
+app.MapPost("/api/search", async (SearchRequest request, HttpContext context, IConversationService conversationService, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var results = await conversationService.SearchMessagesAsync(user.Id, request.Query, request.Limit, request.Offset);
+        return Results.Ok(new { results, totalCount = results.Length });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error searching messages: {ex.Message}");
+        return Results.Problem("Failed to search messages");
+    }
 });
 
 app.Run();

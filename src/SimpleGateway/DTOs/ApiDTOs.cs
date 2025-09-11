@@ -18,16 +18,26 @@ public record ChatRequest(string Model, MessageDto[] Messages, string? Conversat
 
 public record MessageDto(string Role, string Content);
 
-public record CreateConversationRequest(string Title);
+public record CreateConversationRequest(string Title, string Model = "", string Category = "General");
 
 public record UpdateConversationRequest(string Title);
 
-public record ConversationResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt);
+public record ConversationResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, string Model, string Category);
 
 public record MessageResponse(string Id, string Role, string Content, DateTime CreatedAt);
 
-public record ConversationWithMessagesResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, MessageResponse[] Messages);
+public record ConversationWithMessagesResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, string Model, string Category, MessageResponse[] Messages);
 
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
 public record ResetPasswordRequest(string Username, string NewPassword);
+
+public record ConversationExportData(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, MessageExportData[] Messages);
+
+public record MessageExportData(string Role, string Content, DateTime CreatedAt);
+
+public record ConversationImportRequest(ConversationExportData[] Conversations);
+
+public record SearchRequest(string Query, int? Limit = null, int? Offset = null);
+
+public record SearchResult(string ConversationId, string ConversationTitle, string MessageId, string Role, string Content, DateTime CreatedAt, string[] HighlightedContent);
