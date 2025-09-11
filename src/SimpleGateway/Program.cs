@@ -252,7 +252,7 @@ app.MapGet("/api/conversations", async (HttpContext context, IUserService userSe
     return Results.Ok(new { data = conversations });
 });
 
-app.MapPost("/api/conversations", async (CreateConversationRequest request, HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService) =>
+app.MapPost("/api/conversations", async (CreateConversationRequest request, HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService, IAuditService auditService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
@@ -260,6 +260,20 @@ app.MapPost("/api/conversations", async (CreateConversationRequest request, Http
     
     var conversation = await conversationService.CreateConversationAsync(user.Id, request.Title, request.Model, request.Category);
     Console.WriteLine($"Conversation erstellt: {conversation.Id} - {request.Title}");
+    
+    // Log the conversation creation
+    var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var userAgent = context.Request.Headers.UserAgent.ToString();
+    
+    await auditService.LogActionAsync(
+        user.Id, 
+        user.Username, 
+        "conversation.created", 
+        "conversation", 
+        $"Created conversation: {request.Title}", 
+        ipAddress, 
+        userAgent
+    );
     
     return Results.Ok(conversation);
 });
@@ -292,11 +306,27 @@ app.MapPut("/api/conversations/{id}", async (string id, UpdateConversationReques
     return Results.Ok(conversation);
 });
 
-app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IConversationService conversationService, IJwtTokenService jwtService) =>
+app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IConversationService conversationService, IJwtTokenService jwtService, IAuditService auditService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+    
+    // Log the chat action
+    var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    var userAgent = context.Request.Headers.UserAgent.ToString();
+    var lastMessage = request.Messages.LastOrDefault();
+    var messageContent = lastMessage?.Content?.Substring(0, Math.Min(100, lastMessage.Content.Length)) ?? "empty";
+    
+    await auditService.LogActionAsync(
+        user.Id, 
+        user.Username, 
+        "chat.message_sent", 
+        "conversation", 
+        $"Sent message: {messageContent}...", 
+        ipAddress, 
+        userAgent
+    );
     
     try
     {

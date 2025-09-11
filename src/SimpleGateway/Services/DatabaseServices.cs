@@ -1079,7 +1079,17 @@ public class HealthMonitoringService : IHealthMonitoringService
     {
         try
         {
-            await StartHealthMonitoringAsync();
+            // Update service statuses
+            foreach (var service in _serviceStatuses.Keys.ToList())
+            {
+                var isHealthy = await CheckServiceHealthAsync(service);
+                var status = isHealthy ? "Healthy" : "Unhealthy";
+                
+                lock (_lock)
+                {
+                    _serviceStatuses[service] = new ServiceStatus(service, status, DateTime.UtcNow);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -1154,7 +1164,20 @@ public class HealthMonitoringService : IHealthMonitoringService
         try
         {
             var process = System.Diagnostics.Process.GetCurrentProcess();
-            return process.TotalProcessorTime.TotalMilliseconds / Environment.ProcessorCount;
+            var startTime = DateTime.UtcNow;
+            var startCpuUsage = process.TotalProcessorTime;
+            
+            // Wait a short time to get a meaningful measurement
+            Thread.Sleep(100);
+            
+            var endTime = DateTime.UtcNow;
+            var endCpuUsage = process.TotalProcessorTime;
+            
+            var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
+            var totalMsPassed = (endTime - startTime).TotalMilliseconds;
+            var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
+            
+            return Math.Min(cpuUsageTotal * 100, 100.0); // Cap at 100%
         }
         catch
         {
