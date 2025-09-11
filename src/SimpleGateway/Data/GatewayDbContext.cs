@@ -13,6 +13,7 @@ public class GatewayDbContext : DbContext
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<Share> Shares { get; set; }
+    public DbSet<ChatTemplate> ChatTemplates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -72,6 +73,21 @@ public class GatewayDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.SharedByUserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ChatTemplate Configuration
+        modelBuilder.Entity<ChatTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.SystemPrompt).IsRequired();
+            
+            entity.HasOne(e => e.CreatedByUser)
+                  .WithMany()
+                  .HasForeignKey(e => e.CreatedByUserId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

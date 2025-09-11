@@ -49,6 +49,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IShareService, ShareService>();
+builder.Services.AddScoped<IChatTemplateService, ChatTemplateService>();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -766,6 +767,140 @@ app.MapGet("/api/shares", async (HttpContext context, IUserService userService, 
     {
         Console.WriteLine($"Error getting user shares: {ex.Message}");
         return Results.Problem("Failed to get user shares");
+    }
+});
+
+// Chat Templates Endpoints
+app.MapGet("/api/templates", async (IChatTemplateService templateService) =>
+{
+    try
+    {
+        var templates = await templateService.GetAllTemplatesAsync();
+        return Results.Ok(templates);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting templates: {ex.Message}");
+        return Results.Problem("Failed to get templates");
+    }
+});
+
+app.MapGet("/api/templates/categories", async (IChatTemplateService templateService) =>
+{
+    try
+    {
+        var categories = await templateService.GetCategoriesAsync();
+        return Results.Ok(categories);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting categories: {ex.Message}");
+        return Results.Problem("Failed to get categories");
+    }
+});
+
+app.MapGet("/api/templates/{templateId}", async (string templateId, IChatTemplateService templateService) =>
+{
+    try
+    {
+        var template = await templateService.GetTemplateByIdAsync(templateId);
+        if (template == null)
+            return Results.NotFound("Template not found");
+
+        return Results.Ok(template);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting template: {ex.Message}");
+        return Results.Problem("Failed to get template");
+    }
+});
+
+app.MapGet("/api/templates/category/{category}", async (string category, IChatTemplateService templateService) =>
+{
+    try
+    {
+        var templates = await templateService.GetTemplatesByCategoryAsync(category);
+        return Results.Ok(templates);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting templates by category: {ex.Message}");
+        return Results.Problem("Failed to get templates by category");
+    }
+});
+
+app.MapPost("/api/templates", async (CreateTemplateRequest request, HttpContext context, IUserService userService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var template = await templateService.CreateTemplateAsync(user.Id, request);
+        return Results.Created($"/api/templates/{template.Id}", template);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error creating template: {ex.Message}");
+        return Results.Problem("Failed to create template");
+    }
+});
+
+app.MapPut("/api/templates/{templateId}", async (string templateId, CreateTemplateRequest request, HttpContext context, IUserService userService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var success = await templateService.UpdateTemplateAsync(user.Id, templateId, request);
+        if (!success)
+            return Results.NotFound("Template not found or access denied");
+
+        return Results.Ok(new { message = "Template updated successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating template: {ex.Message}");
+        return Results.Problem("Failed to update template");
+    }
+});
+
+app.MapDelete("/api/templates/{templateId}", async (string templateId, HttpContext context, IUserService userService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var success = await templateService.DeleteTemplateAsync(user.Id, templateId);
+        if (!success)
+            return Results.NotFound("Template not found or access denied");
+
+        return Results.Ok(new { message = "Template deleted successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting template: {ex.Message}");
+        return Results.Problem("Failed to delete template");
+    }
+});
+
+app.MapPost("/api/templates/seed", async (IChatTemplateService templateService) =>
+{
+    try
+    {
+        await templateService.SeedBuiltInTemplatesAsync();
+        return Results.Ok(new { message = "Built-in templates seeded successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error seeding templates: {ex.Message}");
+        return Results.Problem("Failed to seed templates");
     }
 });
 

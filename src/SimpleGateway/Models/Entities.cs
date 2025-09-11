@@ -91,3 +91,34 @@ public class Share
     public virtual Conversation Conversation { get; set; } = null!;
     public virtual User SharedByUser { get; set; } = null!;
 }
+
+public class ChatTemplate
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    
+    [Required]
+    [MaxLength(100)]
+    public string Name { get; set; } = string.Empty;
+    
+    [MaxLength(500)]
+    public string Description { get; set; } = string.Empty;
+    
+    [Required]
+    [MaxLength(50)]
+    public string Category { get; set; } = string.Empty;
+    
+    [Required]
+    public string SystemPrompt { get; set; } = string.Empty;
+    
+    public string ExampleMessages { get; set; } = string.Empty; // JSON array of strings
+    
+    public bool IsBuiltIn { get; set; } = false;
+    
+    public string? CreatedByUserId { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    
+    // Navigation Properties
+    public virtual User? CreatedByUser { get; set; }
+}

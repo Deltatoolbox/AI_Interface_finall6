@@ -202,5 +202,82 @@ export const api = {
     })
     if (!response.ok) throw new Error('Failed to get user shares')
     return response.json()
+  },
+
+  // Chat Templates API
+  async getTemplates() {
+    const response = await fetch(`${API_BASE_URL}/api/templates`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get templates')
+    return response.json()
+  },
+
+  async getTemplateCategories() {
+    const response = await fetch(`${API_BASE_URL}/api/templates/categories`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get template categories')
+    return response.json()
+  },
+
+  async getTemplateById(templateId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get template')
+    return response.json()
+  },
+
+  async getTemplatesByCategory(category: string) {
+    const response = await fetch(`${API_BASE_URL}/api/templates/category/${category}`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get templates by category')
+    return response.json()
+  },
+
+  async createTemplate(template: { name: string; description: string; category: string; systemPrompt: string; exampleMessages: string[] }) {
+    const response = await fetch(`${API_BASE_URL}/api/templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(template),
+    })
+    if (!response.ok) throw new Error('Failed to create template')
+    return response.json()
+  },
+
+  async updateTemplate(templateId: string, template: { name: string; description: string; category: string; systemPrompt: string; exampleMessages: string[] }) {
+    const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(template),
+    })
+    if (!response.ok) throw new Error('Failed to update template')
+    return response.json()
+  },
+
+  async deleteTemplate(templateId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/templates/${templateId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to delete template')
+    return response.json()
+  },
+
+  async seedBuiltInTemplates() {
+    const response = await fetch(`${API_BASE_URL}/api/templates/seed`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to seed built-in templates')
+    return response.json()
   }
 }

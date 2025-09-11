@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { LogOut, Settings, MessageSquare, Plus, Search } from 'lucide-react'
+import { LogOut, Settings, MessageSquare, Plus, Search, Sparkles } from 'lucide-react'
 import { ConversationList } from '../components/ConversationList'
 import { MessageList } from '../components/MessageList'
 import { MessageInput } from '../components/MessageInput'
 import { ModelSelector } from '../components/ModelSelector'
+import { TemplateSelector } from '../components/TemplateSelector'
 import { api } from '../api'
 
 interface UploadedFile {
@@ -51,6 +52,7 @@ export default function ChatPage() {
   const [selectedModel, setSelectedModel] = useState<string>('')
   // const [isLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -153,11 +155,14 @@ export default function ChatPage() {
         setCurrentConversation(newConversation)
         setMessages([])
         console.log('Conversation set as current:', newConversation)
+        return newConversation
       } else {
         console.error('Failed to create conversation, status:', response.status)
+        throw new Error('Failed to create conversation')
       }
     } catch (error) {
       console.error('Failed to create conversation:', error)
+      throw error
     }
   }
 
@@ -273,6 +278,41 @@ export default function ChatPage() {
     }
   }
 
+  const handleSelectTemplate = async (template: any) => {
+    try {
+      // Create a new conversation with the template
+      const conversation = await createConversation(template.name, selectedModel, template.category)
+      
+      // Add the system prompt as the first message
+      const systemMessage: Message = {
+        id: `system-${Date.now()}`,
+        role: 'system',
+        content: template.systemPrompt,
+        timestamp: new Date(),
+        files: []
+      }
+      
+      setMessages([systemMessage])
+      
+      // If there are example messages, add them as user messages
+      if (template.exampleMessages && template.exampleMessages.length > 0) {
+        const exampleMessages: Message[] = template.exampleMessages.map((msg: string, index: number) => ({
+          id: `example-${index}-${Date.now()}`,
+          role: 'user' as const,
+          content: msg,
+          timestamp: new Date(),
+          files: []
+        }))
+        
+        setMessages(prev => [...prev, ...exampleMessages])
+      }
+      
+      setCurrentConversation(conversation)
+    } catch (error) {
+      console.error('Failed to apply template:', error)
+    }
+  }
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -289,6 +329,14 @@ export default function ChatPage() {
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
             />
+            
+            <button
+              onClick={() => setShowTemplateSelector(true)}
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              <Sparkles className="h-5 w-5" />
+              <span>Templates</span>
+            </button>
             
             <button
               onClick={() => navigate('/settings')}
@@ -361,6 +409,13 @@ export default function ChatPage() {
           )}
         </div>
       </div>
+      
+      {/* Template Selector Modal */}
+      <TemplateSelector
+        isOpen={showTemplateSelector}
+        onClose={() => setShowTemplateSelector(false)}
+        onSelectTemplate={handleSelectTemplate}
+      />
     </div>
   )
 }

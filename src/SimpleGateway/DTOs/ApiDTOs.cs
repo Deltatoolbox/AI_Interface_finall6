@@ -47,3 +47,8 @@ public record CreateShareRequest(string ConversationId, string? Password = null,
 public record ShareResponse(string ShareId, string ShareUrl, DateTime CreatedAt, DateTime? ExpiresAt, bool IsPasswordProtected);
 public record SharedConversationResponse(string Id, string Title, DateTime CreatedAt, DateTime UpdatedAt, MessageResponse[] Messages, string SharedBy, DateTime SharedAt);
 public record ShareAccessRequest(string ShareId, string? Password = null);
+
+// Chat Templates DTOs
+public record ChatTemplateDto(string Id, string Name, string Description, string Category, string SystemPrompt, string[] ExampleMessages, bool IsBuiltIn);
+public record CreateTemplateRequest(string Name, string Description, string Category, string SystemPrompt, string[] ExampleMessages);
+public record ApplyTemplateRequest(string TemplateId, string? CustomPrompt = null);

@@ -42,6 +42,18 @@ public interface IShareService
     Task<ShareResponse[]> GetUserSharesAsync(string userId);
 }
 
+public interface IChatTemplateService
+{
+    Task<ChatTemplateDto[]> GetAllTemplatesAsync();
+    Task<ChatTemplateDto[]> GetTemplatesByCategoryAsync(string category);
+    Task<ChatTemplateDto?> GetTemplateByIdAsync(string templateId);
+    Task<ChatTemplateDto> CreateTemplateAsync(string userId, CreateTemplateRequest request);
+    Task<bool> UpdateTemplateAsync(string userId, string templateId, CreateTemplateRequest request);
+    Task<bool> DeleteTemplateAsync(string userId, string templateId);
+    Task<string[]> GetCategoriesAsync();
+    Task SeedBuiltInTemplatesAsync();
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -447,6 +459,184 @@ public class ShareService : IShareService
             s.ExpiresAt,
             !string.IsNullOrEmpty(s.PasswordHash)
         )).ToArray();
+    }
+}
+
+public class ChatTemplateService : IChatTemplateService
+{
+    private readonly GatewayDbContext _context;
+
+    public ChatTemplateService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<ChatTemplateDto[]> GetAllTemplatesAsync()
+    {
+        var templates = await _context.ChatTemplates
+            .OrderBy(t => t.Category)
+            .ThenBy(t => t.Name)
+            .ToArrayAsync();
+
+        return templates.Select(MapToDto).ToArray();
+    }
+
+    public async Task<ChatTemplateDto[]> GetTemplatesByCategoryAsync(string category)
+    {
+        var templates = await _context.ChatTemplates
+            .Where(t => t.Category == category)
+            .OrderBy(t => t.Name)
+            .ToArrayAsync();
+
+        return templates.Select(MapToDto).ToArray();
+    }
+
+    public async Task<ChatTemplateDto?> GetTemplateByIdAsync(string templateId)
+    {
+        var template = await _context.ChatTemplates
+            .FirstOrDefaultAsync(t => t.Id == templateId);
+
+        return template != null ? MapToDto(template) : null;
+    }
+
+    public async Task<ChatTemplateDto> CreateTemplateAsync(string userId, CreateTemplateRequest request)
+    {
+        var template = new ChatTemplate
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Category = request.Category,
+            SystemPrompt = request.SystemPrompt,
+            ExampleMessages = System.Text.Json.JsonSerializer.Serialize(request.ExampleMessages),
+            CreatedByUserId = userId,
+            IsBuiltIn = false
+        };
+
+        _context.ChatTemplates.Add(template);
+        await _context.SaveChangesAsync();
+        return MapToDto(template);
+    }
+
+    public async Task<bool> UpdateTemplateAsync(string userId, string templateId, CreateTemplateRequest request)
+    {
+        var template = await _context.ChatTemplates
+            .FirstOrDefaultAsync(t => t.Id == templateId && t.CreatedByUserId == userId);
+
+        if (template == null || template.IsBuiltIn)
+            return false;
+
+        template.Name = request.Name;
+        template.Description = request.Description;
+        template.Category = request.Category;
+        template.SystemPrompt = request.SystemPrompt;
+        template.ExampleMessages = System.Text.Json.JsonSerializer.Serialize(request.ExampleMessages);
+        template.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteTemplateAsync(string userId, string templateId)
+    {
+        var template = await _context.ChatTemplates
+            .FirstOrDefaultAsync(t => t.Id == templateId && t.CreatedByUserId == userId);
+
+        if (template == null || template.IsBuiltIn)
+            return false;
+
+        _context.ChatTemplates.Remove(template);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<string[]> GetCategoriesAsync()
+    {
+        return await _context.ChatTemplates
+            .Select(t => t.Category)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToArrayAsync();
+    }
+
+    public async Task SeedBuiltInTemplatesAsync()
+    {
+        // Check if templates already exist
+        if (await _context.ChatTemplates.AnyAsync())
+            return;
+
+        var builtInTemplates = new[]
+        {
+            new ChatTemplate
+            {
+                Id = "general-assistant",
+                Name = "General Assistant",
+                Description = "A helpful AI assistant for general questions and tasks",
+                Category = "General",
+                SystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Hello! How can I help you today?", "What would you like to know?" }),
+                IsBuiltIn = true
+            },
+            new ChatTemplate
+            {
+                Id = "creative-writer",
+                Name = "Creative Writer",
+                Description = "Specialized in creative writing, storytelling, and content creation",
+                Category = "Creative",
+                SystemPrompt = "You are a creative writing assistant. Help users with storytelling, creative writing, brainstorming ideas, and developing characters and plots.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Help me write a short story about...", "Create a character profile for..." }),
+                IsBuiltIn = true
+            },
+            new ChatTemplate
+            {
+                Id = "code-assistant",
+                Name = "Code Assistant",
+                Description = "Programming and software development helper",
+                Category = "Programming",
+                SystemPrompt = "You are a programming assistant. Help with code writing, debugging, explaining programming concepts, and best practices.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Help me write a function that...", "Explain this code:", "What's wrong with this code?" }),
+                IsBuiltIn = true
+            },
+            new ChatTemplate
+            {
+                Id = "language-tutor",
+                Name = "Language Tutor",
+                Description = "Language learning and practice assistant",
+                Category = "Education",
+                SystemPrompt = "You are a language learning tutor. Help users practice languages, explain grammar, provide translations, and offer learning tips.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Help me practice Spanish", "Explain the difference between...", "Translate this text:" }),
+                IsBuiltIn = true
+            },
+            new ChatTemplate
+            {
+                Id = "business-analyst",
+                Name = "Business Analyst",
+                Description = "Business strategy, analysis, and planning assistant",
+                Category = "Business",
+                SystemPrompt = "You are a business analyst assistant. Help with market analysis, business strategy, financial planning, and organizational development.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Analyze this business case:", "Help me create a business plan", "What are the risks of..." }),
+                IsBuiltIn = true
+            }
+        };
+
+        _context.ChatTemplates.AddRange(builtInTemplates);
+        await _context.SaveChangesAsync();
+    }
+
+    private ChatTemplateDto MapToDto(ChatTemplate template)
+    {
+        var exampleMessages = string.IsNullOrEmpty(template.ExampleMessages) 
+            ? Array.Empty<string>() 
+            : System.Text.Json.JsonSerializer.Deserialize<string[]>(template.ExampleMessages) ?? Array.Empty<string>();
+
+        return new ChatTemplateDto(
+            template.Id,
+            template.Name,
+            template.Description,
+            template.Category,
+            template.SystemPrompt,
+            exampleMessages,
+            template.IsBuiltIn
+        );
     }
 }
 
