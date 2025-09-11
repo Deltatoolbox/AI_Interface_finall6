@@ -18,6 +18,7 @@ public class GatewayDbContext : DbContext
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<SsoConfig> SsoConfigs { get; set; }
     public DbSet<UserPreferences> UserPreferences { get; set; }
+    public DbSet<EncryptionKey> EncryptionKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,7 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.Location).HasMaxLength(100);
             entity.Property(e => e.Website).HasMaxLength(200);
             entity.Property(e => e.Timezone).HasMaxLength(50);
+            entity.Property(e => e.KeyRotationDays).HasDefaultValue(90);
             
             entity.HasOne(e => e.UserRole)
                   .WithMany(e => e.Users)
@@ -172,6 +174,23 @@ public class GatewayDbContext : DbContext
             entity.HasOne(e => e.User)
                   .WithOne()
                   .HasForeignKey<UserPreferences>(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EncryptionKey Configuration
+        modelBuilder.Entity<EncryptionKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.PublicKey).IsRequired();
+            entity.Property(e => e.EncryptedPrivateKey).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.ExpiresAt).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

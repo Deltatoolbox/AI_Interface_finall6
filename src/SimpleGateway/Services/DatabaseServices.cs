@@ -140,6 +140,20 @@ public interface IUserProfileService
     Task<bool> DeleteUserProfileAsync(string userId);
 }
 
+public interface IEncryptionService
+{
+    Task<EncryptionKeyDto> CreateEncryptionKeyAsync(string userId, CreateEncryptionKeyRequest request);
+    Task<EncryptionKeyDto?> GetActiveEncryptionKeyAsync(string userId);
+    Task<EncryptionKeyDto[]> GetUserEncryptionKeysAsync(string userId);
+    Task<bool> DeactivateEncryptionKeyAsync(string keyId);
+    Task<bool> DeleteExpiredKeysAsync();
+    Task<EncryptionStatus> GetEncryptionStatusAsync(string userId);
+    Task<bool> UpdateEncryptionSettingsAsync(string userId, UpdateEncryptionSettingsRequest request);
+    Task<string> EncryptMessageAsync(string content, string userId);
+    Task<string> DecryptMessageAsync(DecryptMessageRequest request, string userId);
+    Task<bool> IsEncryptionEnabledAsync(string userId);
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -2357,5 +2371,189 @@ public class UserProfileService : IUserProfileService
 
         await _context.SaveChangesAsync();
         return true;
+    }
+}
+
+public class EncryptionService : IEncryptionService
+{
+    private readonly GatewayDbContext _context;
+
+    public EncryptionService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<EncryptionKeyDto> CreateEncryptionKeyAsync(string userId, CreateEncryptionKeyRequest request)
+    {
+        // Deactivate existing keys
+        var existingKeys = await _context.EncryptionKeys
+            .Where(k => k.UserId == userId && k.IsActive)
+            .ToListAsync();
+
+        foreach (var key in existingKeys)
+        {
+            key.IsActive = false;
+        }
+
+        // Create new key
+        var expiresAt = DateTime.UtcNow.AddDays(request.ExpirationDays);
+        var encryptionKey = new Models.EncryptionKey
+        {
+            UserId = userId,
+            PublicKey = request.PublicKey,
+            EncryptedPrivateKey = request.EncryptedPrivateKey,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = expiresAt,
+            IsActive = true
+        };
+
+        _context.EncryptionKeys.Add(encryptionKey);
+        await _context.SaveChangesAsync();
+
+        return new EncryptionKeyDto(
+            encryptionKey.Id,
+            encryptionKey.UserId,
+            encryptionKey.PublicKey,
+            encryptionKey.EncryptedPrivateKey,
+            encryptionKey.CreatedAt,
+            encryptionKey.ExpiresAt,
+            encryptionKey.IsActive
+        );
+    }
+
+    public async Task<EncryptionKeyDto?> GetActiveEncryptionKeyAsync(string userId)
+    {
+        var key = await _context.EncryptionKeys
+            .FirstOrDefaultAsync(k => k.UserId == userId && k.IsActive && k.ExpiresAt > DateTime.UtcNow);
+
+        if (key == null) return null;
+
+        return new EncryptionKeyDto(
+            key.Id,
+            key.UserId,
+            key.PublicKey,
+            key.EncryptedPrivateKey,
+            key.CreatedAt,
+            key.ExpiresAt,
+            key.IsActive
+        );
+    }
+
+    public async Task<EncryptionKeyDto[]> GetUserEncryptionKeysAsync(string userId)
+    {
+        var keys = await _context.EncryptionKeys
+            .Where(k => k.UserId == userId)
+            .OrderByDescending(k => k.CreatedAt)
+            .Select(k => new EncryptionKeyDto(
+                k.Id,
+                k.UserId,
+                k.PublicKey,
+                k.EncryptedPrivateKey,
+                k.CreatedAt,
+                k.ExpiresAt,
+                k.IsActive
+            ))
+            .ToArrayAsync();
+
+        return keys;
+    }
+
+    public async Task<bool> DeactivateEncryptionKeyAsync(string keyId)
+    {
+        var key = await _context.EncryptionKeys
+            .FirstOrDefaultAsync(k => k.Id == keyId);
+
+        if (key == null) return false;
+
+        key.IsActive = false;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteExpiredKeysAsync()
+    {
+        var expiredKeys = await _context.EncryptionKeys
+            .Where(k => k.ExpiresAt <= DateTime.UtcNow)
+            .ToListAsync();
+
+        if (expiredKeys.Any())
+        {
+            _context.EncryptionKeys.RemoveRange(expiredKeys);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task<EncryptionStatus> GetEncryptionStatusAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) throw new ArgumentException("User not found");
+
+        var activeKey = await GetActiveEncryptionKeyAsync(userId);
+
+        return new EncryptionStatus(
+            userId,
+            activeKey != null,
+            activeKey?.ExpiresAt,
+            user.EncryptionEnabled
+        );
+    }
+
+    public async Task<bool> UpdateEncryptionSettingsAsync(string userId, UpdateEncryptionSettingsRequest request)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return false;
+
+        if (request.EncryptionEnabled.HasValue)
+            user.EncryptionEnabled = request.EncryptionEnabled.Value;
+
+        if (request.KeyRotationDays.HasValue)
+            user.KeyRotationDays = request.KeyRotationDays.Value;
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<string> EncryptMessageAsync(string content, string userId)
+    {
+        // Simple encryption simulation - in production, use proper encryption libraries
+        // This is a placeholder implementation
+        var key = await GetActiveEncryptionKeyAsync(userId);
+        if (key == null) throw new InvalidOperationException("No active encryption key found");
+
+        // In a real implementation, you would use AES encryption with the user's key
+        // For now, we'll return a base64 encoded version as a placeholder
+        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
+        return Convert.ToBase64String(bytes);
+    }
+
+    public async Task<string> DecryptMessageAsync(DecryptMessageRequest request, string userId)
+    {
+        // Simple decryption simulation - in production, use proper decryption libraries
+        // This is a placeholder implementation
+        var key = await _context.EncryptionKeys
+            .FirstOrDefaultAsync(k => k.Id == request.EncryptionKeyId && k.UserId == userId);
+
+        if (key == null) throw new InvalidOperationException("Encryption key not found");
+
+        // In a real implementation, you would use AES decryption with the user's key
+        // For now, we'll decode the base64 as a placeholder
+        var bytes = Convert.FromBase64String(request.EncryptedContent);
+        return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    public async Task<bool> IsEncryptionEnabledAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        return user?.EncryptionEnabled ?? false;
     }
 }

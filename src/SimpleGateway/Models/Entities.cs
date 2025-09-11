@@ -37,6 +37,9 @@ public class User
     public string Interests { get; set; } = "[]"; // JSON array
     public string Skills { get; set; } = "[]"; // JSON array
     
+    public bool EncryptionEnabled { get; set; } = false;
+    public int KeyRotationDays { get; set; } = 90;
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
@@ -89,8 +92,14 @@ public class Message
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
+    public bool IsEncrypted { get; set; } = false;
+    public string? EncryptionKeyId { get; set; }
+    public string? Iv { get; set; }
+    public string? Tag { get; set; }
+    
     // Navigation Properties
     public virtual Conversation Conversation { get; set; } = null!;
+    public virtual EncryptionKey? EncryptionKey { get; set; }
 }
 
 public class Share
@@ -231,4 +240,22 @@ public class UserPreferences
     
     // Navigation Properties
     public virtual User User { get; set; } = null!;
+}
+
+public class EncryptionKey
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+    [Required]
+    public string PublicKey { get; set; } = string.Empty;
+    [Required]
+    public string EncryptedPrivateKey { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ExpiresAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    
+    // Navigation Properties
+    public virtual User User { get; set; } = null!;
+    public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 }

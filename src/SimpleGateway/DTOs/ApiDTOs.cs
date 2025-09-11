@@ -95,3 +95,11 @@ public record UserProfile(string UserId, string Username, string Email, string? 
 public record UpdateUserProfileRequest(string? AvatarUrl, string? Bio, string? Location, string? Website, string? Timezone, string[]? Interests, string[]? Skills);
 public record UserPreferencesDto(string UserId, string Theme, string Language, bool EmailNotifications, bool PushNotifications, bool DarkMode, string[] NotificationSettings, DateTime UpdatedAt);
 public record UpdateUserPreferencesRequest(string? Theme, string? Language, bool? EmailNotifications, bool? PushNotifications, bool? DarkMode, string[]? NotificationSettings);
+
+// End-to-End Encryption DTOs
+public record EncryptionKeyDto(string KeyId, string UserId, string PublicKey, string EncryptedPrivateKey, DateTime CreatedAt, DateTime ExpiresAt, bool IsActive);
+public record CreateEncryptionKeyRequest(string PublicKey, string EncryptedPrivateKey, int ExpirationDays = 365);
+public record EncryptedMessage(string MessageId, string ConversationId, string EncryptedContent, string EncryptionKeyId, string Iv, string Tag, DateTime CreatedAt);
+public record DecryptMessageRequest(string EncryptedContent, string EncryptionKeyId, string Iv, string Tag);
+public record EncryptionStatus(string UserId, bool HasActiveKey, DateTime? KeyExpiresAt, bool EncryptionEnabled);
+public record UpdateEncryptionSettingsRequest(bool? EncryptionEnabled, int? KeyRotationDays = 90);
