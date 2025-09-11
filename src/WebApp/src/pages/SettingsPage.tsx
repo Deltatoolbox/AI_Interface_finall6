@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { useNavigate } from 'react-router-dom'
-import { Settings, User, Shield, LogOut, ArrowLeft, Palette, Database, Key, Trash2, Lock, AlertTriangle, HardDrive, Activity } from 'lucide-react'
+import { Settings, User, Shield, LogOut, ArrowLeft, Palette, Database, Key, Trash2, Lock, AlertTriangle, HardDrive } from 'lucide-react'
 import { api } from '../api'
 
 export default function SettingsPage() {
@@ -168,7 +168,6 @@ export default function SettingsPage() {
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'privacy', label: 'Privacy', icon: Shield },
     { id: 'backups', label: 'Backups', icon: HardDrive },
-    { id: 'health', label: 'Health Monitoring', icon: Activity },
     ...(user?.role === 'Admin' ? [{ id: 'admin', label: 'Admin Dashboard', icon: Database }] : [])
   ]
 
@@ -477,34 +476,6 @@ export default function SettingsPage() {
                         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Automatic Backups</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                           Automatic backups are created every 24 hours and kept for 7 days.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'health' && (
-                  <div>
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">Health Monitoring</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
-                      Monitor system performance, service status, and real-time metrics.
-                    </p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <button
-                        onClick={() => navigate('/health')}
-                        className="p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
-                      >
-                        <Activity className="h-8 w-8 text-green-600 dark:text-green-400 mb-3" />
-                        <h3 className="text-lg font-medium text-green-900 dark:text-green-100">System Health</h3>
-                        <p className="text-sm text-green-700 dark:text-green-300 mt-2">View real-time system metrics and service status</p>
-                      </button>
-                      
-                      <div className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                        <Settings className="h-8 w-8 text-gray-600 dark:text-gray-400 mb-3" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Auto Monitoring</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                          System health is monitored automatically every 30 seconds.
                         </p>
                       </div>
                     </div>

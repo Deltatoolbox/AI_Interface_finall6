@@ -12,7 +12,6 @@ import DebugPage from './pages/DebugPage'
 import SearchPage from './pages/SearchPage'
 import SharedConversationPage from './pages/SharedConversationPage'
 import BackupManagementPage from './pages/BackupManagementPage'
-import HealthMonitoringPage from './pages/HealthMonitoringPage'
 
 function App() {
   return (
@@ -56,14 +55,6 @@ function App() {
           element={
             <ProtectedRoute>
               <BackupManagementPage />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/health" 
-          element={
-            <ProtectedRoute>
-              <HealthMonitoringPage />
             </ProtectedRoute>
           } 
         />
