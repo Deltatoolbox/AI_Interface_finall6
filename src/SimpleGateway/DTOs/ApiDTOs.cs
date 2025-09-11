@@ -63,3 +63,16 @@ public record SystemHealth(string Status, DateTime Timestamp, SystemMetrics Metr
 public record SystemMetrics(double CpuUsage, long MemoryUsage, long DiskUsage, int ActiveConnections, int TotalRequests, double ResponseTime);
 public record ServiceStatus(string Name, string Status, DateTime LastCheck, string? ErrorMessage = null);
 public record HealthCheckRequest(string ServiceName);
+
+// Audit Trail DTOs
+public record AuditLogDto(string Id, string UserId, string UserName, string Action, string Resource, string Details, DateTime Timestamp, string IpAddress, string UserAgent);
+public record AuditLogFilter(string? UserId = null, string? Action = null, string? Resource = null, DateTime? StartDate = null, DateTime? EndDate = null, int Page = 1, int PageSize = 50);
+public record AuditLogResponse(AuditLogDto[] Logs, int TotalCount, int Page, int PageSize, int TotalPages);
+
+// User Roles DTOs
+public record UserRoleDto(string Id, string Name, string Description, string[] Permissions, DateTime CreatedAt, DateTime UpdatedAt);
+public record CreateUserRoleRequest(string Name, string Description, string[] Permissions);
+public record UpdateUserRoleRequest(string Name, string Description, string[] Permissions);
+public record AssignRoleRequest(string UserId, string RoleId);
+public record UserWithRole(string Id, string Username, string Email, string Role, string RoleId, DateTime CreatedAt, DateTime LastLoginAt);
+public record RolePermission(string Name, string Description, string Category);

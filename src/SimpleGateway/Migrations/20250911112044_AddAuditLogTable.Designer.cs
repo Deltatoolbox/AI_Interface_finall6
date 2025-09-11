@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SimpleGateway.Data;
 
@@ -10,9 +11,11 @@ using SimpleGateway.Data;
 namespace SimpleGateway.Migrations
 {
     [DbContext(typeof(GatewayDbContext))]
-    partial class GatewayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250911112044_AddAuditLogTable")]
+    partial class AddAuditLogTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -53,9 +56,6 @@ namespace SimpleGateway.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("UserId1")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -70,8 +70,6 @@ namespace SimpleGateway.Migrations
                     b.HasIndex("Timestamp");
 
                     b.HasIndex("UserId");
-
-                    b.HasIndex("UserId1");
 
                     b.ToTable("AuditLogs");
                 });
@@ -116,14 +114,9 @@ namespace SimpleGateway.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("UserId")
-                        .HasColumnType("TEXT");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("ChatTemplates");
                 });
@@ -218,16 +211,11 @@ namespace SimpleGateway.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("UserId")
-                        .HasColumnType("TEXT");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ConversationId");
 
                     b.HasIndex("SharedByUserId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Shares");
                 });
@@ -256,9 +244,6 @@ namespace SimpleGateway.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("User");
 
-                    b.Property<string>("RoleId")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
@@ -269,48 +254,10 @@ namespace SimpleGateway.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RoleId");
-
                     b.HasIndex("Username")
                         .IsUnique();
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("SimpleGateway.Models.UserRole", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsBuiltIn")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Permissions")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("UserRoles");
                 });
 
             modelBuilder.Entity("SimpleGateway.Models.AuditLog", b =>
@@ -321,10 +268,6 @@ namespace SimpleGateway.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SimpleGateway.Models.User", null)
-                        .WithMany("AuditLogs")
-                        .HasForeignKey("UserId1");
-
                     b.Navigation("User");
                 });
 
@@ -334,10 +277,6 @@ namespace SimpleGateway.Migrations
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SimpleGateway.Models.User", null)
-                        .WithMany("CreatedTemplates")
-                        .HasForeignKey("UserId");
 
                     b.Navigation("CreatedByUser");
                 });
@@ -378,23 +317,9 @@ namespace SimpleGateway.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SimpleGateway.Models.User", null)
-                        .WithMany("Shares")
-                        .HasForeignKey("UserId");
-
                     b.Navigation("Conversation");
 
                     b.Navigation("SharedByUser");
-                });
-
-            modelBuilder.Entity("SimpleGateway.Models.User", b =>
-                {
-                    b.HasOne("SimpleGateway.Models.UserRole", "UserRole")
-                        .WithMany("Users")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("UserRole");
                 });
 
             modelBuilder.Entity("SimpleGateway.Models.Conversation", b =>
@@ -404,18 +329,7 @@ namespace SimpleGateway.Migrations
 
             modelBuilder.Entity("SimpleGateway.Models.User", b =>
                 {
-                    b.Navigation("AuditLogs");
-
                     b.Navigation("Conversations");
-
-                    b.Navigation("CreatedTemplates");
-
-                    b.Navigation("Shares");
-                });
-
-            modelBuilder.Entity("SimpleGateway.Models.UserRole", b =>
-                {
-                    b.Navigation("Users");
                 });
 #pragma warning restore 612, 618
         }

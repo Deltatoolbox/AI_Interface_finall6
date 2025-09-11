@@ -19,11 +19,17 @@ public class User
     [MaxLength(20)]
     public string Role { get; set; } = "User";
     
+    public string? RoleId { get; set; }
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
     // Navigation Properties
     public virtual ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
+    public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
+    public virtual ICollection<ChatTemplate> CreatedTemplates { get; set; } = new List<ChatTemplate>();
+    public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+    public virtual UserRole? UserRole { get; set; }
 }
 
 public class Conversation
@@ -121,4 +127,45 @@ public class ChatTemplate
     
     // Navigation Properties
     public virtual User? CreatedByUser { get; set; }
+}
+
+public class AuditLog
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(100)]
+    public string UserName { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(50)]
+    public string Action { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(100)]
+    public string Resource { get; set; } = string.Empty;
+    public string Details { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    [MaxLength(45)]
+    public string IpAddress { get; set; } = string.Empty;
+    [MaxLength(500)]
+    public string UserAgent { get; set; } = string.Empty;
+    
+    public virtual User? User { get; set; }
+}
+
+public class UserRole
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    [MaxLength(50)]
+    public string Name { get; set; } = string.Empty;
+    [MaxLength(200)]
+    public string Description { get; set; } = string.Empty;
+    public string Permissions { get; set; } = string.Empty; // JSON array of permission strings
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsBuiltIn { get; set; } = false;
+    
+    // Navigation Properties
+    public virtual ICollection<User> Users { get; set; } = new List<User>();
 }

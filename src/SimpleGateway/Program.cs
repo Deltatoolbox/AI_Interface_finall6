@@ -52,6 +52,8 @@ builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<IChatTemplateService, ChatTemplateService>();
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddScoped<IHealthMonitoringService, HealthMonitoringService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IUserRoleService, UserRoleService>();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -1090,6 +1092,259 @@ app.MapPost("/api/health/check/{serviceName}", async (string serviceName, IHealt
     {
         Console.WriteLine($"Error checking service health: {ex.Message}");
         return Results.Problem("Failed to check service health");
+    }
+});
+
+// Audit Trail Endpoints
+app.MapGet("/api/audit/logs", async (
+    [AsParameters] AuditLogFilter filter,
+    HttpContext context, 
+    IUserService userService, 
+    IAuditService auditService, 
+    IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    // Only admins can view audit logs
+    if (user.Role != "Admin")
+        return Results.Forbid();
+
+    try
+    {
+        var response = await auditService.GetAuditLogsAsync(filter);
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting audit logs: {ex.Message}");
+        return Results.Problem("Failed to get audit logs");
+    }
+});
+
+app.MapGet("/api/audit/actions", async (HttpContext context, IUserService userService, IAuditService auditService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (user.Role != "Admin")
+        return Results.Forbid();
+
+    try
+    {
+        var actions = await auditService.GetAvailableActionsAsync();
+        return Results.Ok(actions);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting available actions: {ex.Message}");
+        return Results.Problem("Failed to get available actions");
+    }
+});
+
+app.MapGet("/api/audit/resources", async (HttpContext context, IUserService userService, IAuditService auditService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (user.Role != "Admin")
+        return Results.Forbid();
+
+    try
+    {
+        var resources = await auditService.GetAvailableResourcesAsync();
+        return Results.Ok(resources);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting available resources: {ex.Message}");
+        return Results.Problem("Failed to get available resources");
+    }
+});
+
+// User Roles Endpoints
+app.MapGet("/api/roles", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    // Check if user has permission to view roles
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.view"))
+        return Results.Forbid();
+
+    try
+    {
+        var roles = await roleService.GetAllRolesAsync();
+        return Results.Ok(roles);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting roles: {ex.Message}");
+        return Results.Problem("Failed to get roles");
+    }
+});
+
+app.MapGet("/api/roles/{roleId}", async (string roleId, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.view"))
+        return Results.Forbid();
+
+    try
+    {
+        var role = await roleService.GetRoleByIdAsync(roleId);
+        if (role == null)
+            return Results.NotFound();
+
+        return Results.Ok(role);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting role: {ex.Message}");
+        return Results.Problem("Failed to get role");
+    }
+});
+
+app.MapPost("/api/roles", async (CreateUserRoleRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.create"))
+        return Results.Forbid();
+
+    try
+    {
+        var role = await roleService.CreateRoleAsync(request);
+        return Results.Created($"/api/roles/{role.Id}", role);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error creating role: {ex.Message}");
+        return Results.Problem("Failed to create role");
+    }
+});
+
+app.MapPut("/api/roles/{roleId}", async (string roleId, UpdateUserRoleRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.edit"))
+        return Results.Forbid();
+
+    try
+    {
+        var role = await roleService.UpdateRoleAsync(roleId, request);
+        return Results.Ok(role);
+    }
+    catch (ArgumentException)
+    {
+        return Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating role: {ex.Message}");
+        return Results.Problem("Failed to update role");
+    }
+});
+
+app.MapDelete("/api/roles/{roleId}", async (string roleId, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.delete"))
+        return Results.Forbid();
+
+    try
+    {
+        var success = await roleService.DeleteRoleAsync(roleId);
+        if (!success)
+            return Results.NotFound();
+
+        return Results.NoContent();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting role: {ex.Message}");
+        return Results.Problem("Failed to delete role");
+    }
+});
+
+app.MapPost("/api/roles/assign", async (AssignRoleRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.assign"))
+        return Results.Forbid();
+
+    try
+    {
+        var success = await roleService.AssignRoleToUserAsync(request.UserId, request.RoleId);
+        if (!success)
+            return Results.NotFound();
+
+        return Results.Ok(new { success = true });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error assigning role: {ex.Message}");
+        return Results.Problem("Failed to assign role");
+    }
+});
+
+app.MapGet("/api/roles/permissions", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "roles.view"))
+        return Results.Forbid();
+
+    try
+    {
+        var permissions = await roleService.GetAvailablePermissionsAsync();
+        return Results.Ok(permissions);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting permissions: {ex.Message}");
+        return Results.Problem("Failed to get permissions");
+    }
+});
+
+app.MapGet("/api/users/with-roles", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "users.view"))
+        return Results.Forbid();
+
+    try
+    {
+        var users = await roleService.GetUsersWithRolesAsync();
+        return Results.Ok(users);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting users with roles: {ex.Message}");
+        return Results.Problem("Failed to get users with roles");
     }
 });
 

@@ -75,6 +75,35 @@ public interface IHealthMonitoringService
     Task StopHealthMonitoringAsync();
 }
 
+public interface IAuditService
+{
+    Task LogActionAsync(string userId, string userName, string action, string resource, string details, string ipAddress, string userAgent);
+    Task<AuditLogResponse> GetAuditLogsAsync(AuditLogFilter filter);
+    Task<AuditLogDto[]> GetAuditLogsByUserAsync(string userId, int page = 1, int pageSize = 50);
+    Task<AuditLogDto[]> GetAuditLogsByActionAsync(string action, int page = 1, int pageSize = 50);
+    Task<AuditLogDto[]> GetAuditLogsByResourceAsync(string resource, int page = 1, int pageSize = 50);
+    Task<AuditLogDto[]> GetAuditLogsByDateRangeAsync(DateTime startDate, DateTime endDate, int page = 1, int pageSize = 50);
+    Task<string[]> GetAvailableActionsAsync();
+    Task<string[]> GetAvailableResourcesAsync();
+}
+
+public interface IUserRoleService
+{
+    Task<UserRoleDto[]> GetAllRolesAsync();
+    Task<UserRoleDto?> GetRoleByIdAsync(string roleId);
+    Task<UserRoleDto?> GetRoleByNameAsync(string roleName);
+    Task<UserRoleDto> CreateRoleAsync(CreateUserRoleRequest request);
+    Task<UserRoleDto> UpdateRoleAsync(string roleId, UpdateUserRoleRequest request);
+    Task<bool> DeleteRoleAsync(string roleId);
+    Task<bool> AssignRoleToUserAsync(string userId, string roleId);
+    Task<bool> RemoveRoleFromUserAsync(string userId);
+    Task<UserWithRole[]> GetUsersWithRolesAsync();
+    Task<UserWithRole?> GetUserWithRoleAsync(string userId);
+    Task<RolePermission[]> GetAvailablePermissionsAsync();
+    Task<bool> UserHasPermissionAsync(string userId, string permission);
+    Task InitializeDefaultRolesAsync();
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -1116,6 +1145,512 @@ public class HealthMonitoringService : IHealthMonitoringService
                 _responseTimes.RemoveAt(0);
             }
         }
+    }
+}
+
+public class AuditService : IAuditService
+{
+    private readonly GatewayDbContext _context;
+
+    public AuditService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task LogActionAsync(string userId, string userName, string action, string resource, string details, string ipAddress, string userAgent)
+    {
+        var auditLog = new AuditLog
+        {
+            UserId = userId,
+            UserName = userName,
+            Action = action,
+            Resource = resource,
+            Details = details,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            Timestamp = DateTime.UtcNow
+        };
+
+        _context.AuditLogs.Add(auditLog);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<AuditLogResponse> GetAuditLogsAsync(AuditLogFilter filter)
+    {
+        var query = _context.AuditLogs.AsQueryable();
+
+        // Apply filters
+        if (!string.IsNullOrEmpty(filter.UserId))
+            query = query.Where(log => log.UserId == filter.UserId);
+
+        if (!string.IsNullOrEmpty(filter.Action))
+            query = query.Where(log => log.Action == filter.Action);
+
+        if (!string.IsNullOrEmpty(filter.Resource))
+            query = query.Where(log => log.Resource == filter.Resource);
+
+        if (filter.StartDate.HasValue)
+            query = query.Where(log => log.Timestamp >= filter.StartDate.Value);
+
+        if (filter.EndDate.HasValue)
+            query = query.Where(log => log.Timestamp <= filter.EndDate.Value);
+
+        // Get total count
+        var totalCount = await query.CountAsync();
+
+        // Apply pagination
+        var logs = await query
+            .OrderByDescending(log => log.Timestamp)
+            .Skip((filter.Page - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .Select(log => new AuditLogDto(
+                log.Id,
+                log.UserId,
+                log.UserName,
+                log.Action,
+                log.Resource,
+                log.Details,
+                log.Timestamp,
+                log.IpAddress,
+                log.UserAgent
+            ))
+            .ToArrayAsync();
+
+        var totalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize);
+
+        return new AuditLogResponse(logs, totalCount, filter.Page, filter.PageSize, totalPages);
+    }
+
+    public async Task<AuditLogDto[]> GetAuditLogsByUserAsync(string userId, int page = 1, int pageSize = 50)
+    {
+        var logs = await _context.AuditLogs
+            .Where(log => log.UserId == userId)
+            .OrderByDescending(log => log.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(log => new AuditLogDto(
+                log.Id,
+                log.UserId,
+                log.UserName,
+                log.Action,
+                log.Resource,
+                log.Details,
+                log.Timestamp,
+                log.IpAddress,
+                log.UserAgent
+            ))
+            .ToArrayAsync();
+
+        return logs;
+    }
+
+    public async Task<AuditLogDto[]> GetAuditLogsByActionAsync(string action, int page = 1, int pageSize = 50)
+    {
+        var logs = await _context.AuditLogs
+            .Where(log => log.Action == action)
+            .OrderByDescending(log => log.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(log => new AuditLogDto(
+                log.Id,
+                log.UserId,
+                log.UserName,
+                log.Action,
+                log.Resource,
+                log.Details,
+                log.Timestamp,
+                log.IpAddress,
+                log.UserAgent
+            ))
+            .ToArrayAsync();
+
+        return logs;
+    }
+
+    public async Task<AuditLogDto[]> GetAuditLogsByResourceAsync(string resource, int page = 1, int pageSize = 50)
+    {
+        var logs = await _context.AuditLogs
+            .Where(log => log.Resource == resource)
+            .OrderByDescending(log => log.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(log => new AuditLogDto(
+                log.Id,
+                log.UserId,
+                log.UserName,
+                log.Action,
+                log.Resource,
+                log.Details,
+                log.Timestamp,
+                log.IpAddress,
+                log.UserAgent
+            ))
+            .ToArrayAsync();
+
+        return logs;
+    }
+
+    public async Task<AuditLogDto[]> GetAuditLogsByDateRangeAsync(DateTime startDate, DateTime endDate, int page = 1, int pageSize = 50)
+    {
+        var logs = await _context.AuditLogs
+            .Where(log => log.Timestamp >= startDate && log.Timestamp <= endDate)
+            .OrderByDescending(log => log.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(log => new AuditLogDto(
+                log.Id,
+                log.UserId,
+                log.UserName,
+                log.Action,
+                log.Resource,
+                log.Details,
+                log.Timestamp,
+                log.IpAddress,
+                log.UserAgent
+            ))
+            .ToArrayAsync();
+
+        return logs;
+    }
+
+    public async Task<string[]> GetAvailableActionsAsync()
+    {
+        var actions = await _context.AuditLogs
+            .Select(log => log.Action)
+            .Distinct()
+            .OrderBy(action => action)
+            .ToArrayAsync();
+
+        return actions;
+    }
+
+    public async Task<string[]> GetAvailableResourcesAsync()
+    {
+        var resources = await _context.AuditLogs
+            .Select(log => log.Resource)
+            .Distinct()
+            .OrderBy(resource => resource)
+            .ToArrayAsync();
+
+        return resources;
+    }
+}
+
+public class UserRoleService : IUserRoleService
+{
+    private readonly GatewayDbContext _context;
+
+    public UserRoleService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<UserRoleDto[]> GetAllRolesAsync()
+    {
+        var roles = await _context.UserRoles
+            .OrderBy(r => r.Name)
+            .ToArrayAsync();
+
+        return roles.Select(r => new UserRoleDto(
+            r.Id,
+            r.Name,
+            r.Description,
+            System.Text.Json.JsonSerializer.Deserialize<string[]>(r.Permissions) ?? Array.Empty<string>(),
+            r.CreatedAt,
+            r.UpdatedAt
+        )).ToArray();
+    }
+
+    public async Task<UserRoleDto?> GetRoleByIdAsync(string roleId)
+    {
+        var role = await _context.UserRoles
+            .FirstOrDefaultAsync(r => r.Id == roleId);
+
+        if (role == null) return null;
+
+        return new UserRoleDto(
+            role.Id,
+            role.Name,
+            role.Description,
+            System.Text.Json.JsonSerializer.Deserialize<string[]>(role.Permissions) ?? Array.Empty<string>(),
+            role.CreatedAt,
+            role.UpdatedAt
+        );
+    }
+
+    public async Task<UserRoleDto?> GetRoleByNameAsync(string roleName)
+    {
+        var role = await _context.UserRoles
+            .FirstOrDefaultAsync(r => r.Name == roleName);
+
+        if (role == null) return null;
+
+        return new UserRoleDto(
+            role.Id,
+            role.Name,
+            role.Description,
+            System.Text.Json.JsonSerializer.Deserialize<string[]>(role.Permissions) ?? Array.Empty<string>(),
+            role.CreatedAt,
+            role.UpdatedAt
+        );
+    }
+
+    public async Task<UserRoleDto> CreateRoleAsync(CreateUserRoleRequest request)
+    {
+        var role = new Models.UserRole
+        {
+            Name = request.Name,
+            Description = request.Description,
+            Permissions = System.Text.Json.JsonSerializer.Serialize(request.Permissions),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.UserRoles.Add(role);
+        await _context.SaveChangesAsync();
+
+        return new UserRoleDto(
+            role.Id,
+            role.Name,
+            role.Description,
+            request.Permissions,
+            role.CreatedAt,
+            role.UpdatedAt
+        );
+    }
+
+    public async Task<UserRoleDto> UpdateRoleAsync(string roleId, UpdateUserRoleRequest request)
+    {
+        var role = await _context.UserRoles.FindAsync(roleId);
+        if (role == null) throw new ArgumentException("Role not found");
+
+        role.Name = request.Name;
+        role.Description = request.Description;
+        role.Permissions = System.Text.Json.JsonSerializer.Serialize(request.Permissions);
+        role.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new UserRoleDto(
+            role.Id,
+            role.Name,
+            role.Description,
+            request.Permissions,
+            role.CreatedAt,
+            role.UpdatedAt
+        );
+    }
+
+    public async Task<bool> DeleteRoleAsync(string roleId)
+    {
+        var role = await _context.UserRoles.FindAsync(roleId);
+        if (role == null) return false;
+
+        if (role.IsBuiltIn) return false; // Cannot delete built-in roles
+
+        _context.UserRoles.Remove(role);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> AssignRoleToUserAsync(string userId, string roleId)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        var role = await _context.UserRoles.FindAsync(roleId);
+
+        if (user == null || role == null) return false;
+
+        user.RoleId = roleId;
+        user.Role = role.Name;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> RemoveRoleFromUserAsync(string userId)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return false;
+
+        user.RoleId = null;
+        user.Role = "User";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<UserWithRole[]> GetUsersWithRolesAsync()
+    {
+        var users = await _context.Users
+            .Include(u => u.UserRole)
+            .Select(u => new UserWithRole(
+                u.Id,
+                u.Username,
+                u.Email,
+                u.Role,
+                u.RoleId ?? "",
+                u.CreatedAt,
+                u.UpdatedAt
+            ))
+            .ToArrayAsync();
+
+        return users;
+    }
+
+    public async Task<UserWithRole?> GetUserWithRoleAsync(string userId)
+    {
+        var user = await _context.Users
+            .Include(u => u.UserRole)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return null;
+
+        return new UserWithRole(
+            user.Id,
+            user.Username,
+            user.Email,
+            user.Role,
+            user.RoleId ?? "",
+            user.CreatedAt,
+            user.UpdatedAt
+        );
+    }
+
+    public async Task<RolePermission[]> GetAvailablePermissionsAsync()
+    {
+        var permissions = new List<RolePermission>
+        {
+            // User Management
+            new("users.view", "View users", "User Management"),
+            new("users.create", "Create users", "User Management"),
+            new("users.edit", "Edit users", "User Management"),
+            new("users.delete", "Delete users", "User Management"),
+            
+            // Role Management
+            new("roles.view", "View roles", "Role Management"),
+            new("roles.create", "Create roles", "Role Management"),
+            new("roles.edit", "Edit roles", "Role Management"),
+            new("roles.delete", "Delete roles", "Role Management"),
+            new("roles.assign", "Assign roles to users", "Role Management"),
+            
+            // System Administration
+            new("admin.dashboard", "Access admin dashboard", "System Administration"),
+            new("admin.settings", "Manage system settings", "System Administration"),
+            new("admin.backups", "Manage backups", "System Administration"),
+            new("admin.health", "View system health", "System Administration"),
+            new("admin.audit", "View audit logs", "System Administration"),
+            
+            // Content Management
+            new("conversations.view", "View conversations", "Content Management"),
+            new("conversations.create", "Create conversations", "Content Management"),
+            new("conversations.edit", "Edit conversations", "Content Management"),
+            new("conversations.delete", "Delete conversations", "Content Management"),
+            new("conversations.share", "Share conversations", "Content Management"),
+            
+            // Templates
+            new("templates.view", "View templates", "Templates"),
+            new("templates.create", "Create templates", "Templates"),
+            new("templates.edit", "Edit templates", "Templates"),
+            new("templates.delete", "Delete templates", "Templates"),
+            
+            // File Management
+            new("files.upload", "Upload files", "File Management"),
+            new("files.download", "Download files", "File Management"),
+            new("files.delete", "Delete files", "File Management")
+        };
+
+        return permissions.ToArray();
+    }
+
+    public async Task<bool> UserHasPermissionAsync(string userId, string permission)
+    {
+        var user = await _context.Users
+            .Include(u => u.UserRole)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user?.UserRole == null) return false;
+
+        var permissions = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.UserRole.Permissions) ?? Array.Empty<string>();
+        return permissions.Contains(permission);
+    }
+
+    public async Task InitializeDefaultRolesAsync()
+    {
+        var existingRoles = await _context.UserRoles.AnyAsync();
+        if (existingRoles) return;
+
+        var defaultRoles = new[]
+        {
+            new Models.UserRole
+            {
+                Name = "SuperAdmin",
+                Description = "Full system access with all permissions",
+                Permissions = System.Text.Json.JsonSerializer.Serialize(new[]
+                {
+                    "users.view", "users.create", "users.edit", "users.delete",
+                    "roles.view", "roles.create", "roles.edit", "roles.delete", "roles.assign",
+                    "admin.dashboard", "admin.settings", "admin.backups", "admin.health", "admin.audit",
+                    "conversations.view", "conversations.create", "conversations.edit", "conversations.delete", "conversations.share",
+                    "templates.view", "templates.create", "templates.edit", "templates.delete",
+                    "files.upload", "files.download", "files.delete"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Models.UserRole
+            {
+                Name = "Admin",
+                Description = "Administrative access with most permissions",
+                Permissions = System.Text.Json.JsonSerializer.Serialize(new[]
+                {
+                    "users.view", "users.create", "users.edit",
+                    "roles.view", "roles.assign",
+                    "admin.dashboard", "admin.settings", "admin.backups", "admin.health", "admin.audit",
+                    "conversations.view", "conversations.create", "conversations.edit", "conversations.delete", "conversations.share",
+                    "templates.view", "templates.create", "templates.edit", "templates.delete",
+                    "files.upload", "files.download", "files.delete"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Models.UserRole
+            {
+                Name = "Moderator",
+                Description = "Moderation access with limited administrative permissions",
+                Permissions = System.Text.Json.JsonSerializer.Serialize(new[]
+                {
+                    "users.view",
+                    "admin.dashboard", "admin.health", "admin.audit",
+                    "conversations.view", "conversations.create", "conversations.edit", "conversations.share",
+                    "templates.view", "templates.create", "templates.edit",
+                    "files.upload", "files.download"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new Models.UserRole
+            {
+                Name = "User",
+                Description = "Standard user with basic permissions",
+                Permissions = System.Text.Json.JsonSerializer.Serialize(new[]
+                {
+                    "conversations.view", "conversations.create", "conversations.edit", "conversations.share",
+                    "templates.view",
+                    "files.upload", "files.download"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }
+        };
+
+        _context.UserRoles.AddRange(defaultRoles);
+        await _context.SaveChangesAsync();
     }
 }
 
