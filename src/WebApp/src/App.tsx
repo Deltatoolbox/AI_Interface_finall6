@@ -12,6 +12,7 @@ import DebugPage from './pages/DebugPage'
 import SearchPage from './pages/SearchPage'
 import SharedConversationPage from './pages/SharedConversationPage'
 import BackupManagementPage from './pages/BackupManagementPage'
+import AuditLogPage from './pages/AuditLogPage'
 
 function App() {
   return (
@@ -55,6 +56,14 @@ function App() {
           element={
             <ProtectedRoute>
               <BackupManagementPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/audit" 
+          element={
+            <ProtectedRoute requireAdmin>
+              <AuditLogPage />
             </ProtectedRoute>
           } 
         />

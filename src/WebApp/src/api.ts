@@ -379,5 +379,72 @@ export const api = {
     })
     if (!response.ok) throw new Error('Failed to check service health')
     return response.json()
+  },
+
+  // Audit Trail API
+  async getAuditLogs(filter: AuditLogFilter) {
+    const params = new URLSearchParams()
+    if (filter.userId) params.append('UserId', filter.userId)
+    if (filter.action) params.append('Action', filter.action)
+    if (filter.resource) params.append('Resource', filter.resource)
+    if (filter.startDate) params.append('StartDate', filter.startDate.toISOString())
+    if (filter.endDate) params.append('EndDate', filter.endDate.toISOString())
+    params.append('Page', (filter.page || 1).toString())
+    params.append('PageSize', (filter.pageSize || 50).toString())
+
+    const response = await fetch(`${API_BASE_URL}/api/audit/logs?${params}`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get audit logs')
+    return response.json()
+  },
+
+  async getAvailableActions() {
+    const response = await fetch(`${API_BASE_URL}/api/audit/actions`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get available actions')
+    return response.json()
+  },
+
+  async getAvailableResources() {
+    const response = await fetch(`${API_BASE_URL}/api/audit/resources`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get available resources')
+    return response.json()
   }
+}
+
+export interface AuditLogDto {
+  id: string
+  userId: string
+  userName: string
+  action: string
+  resource: string
+  details: string
+  timestamp: string
+  ipAddress: string
+  userAgent: string
+}
+
+export interface AuditLogFilter {
+  userId?: string
+  action?: string
+  resource?: string
+  startDate?: Date
+  endDate?: Date
+  page?: number
+  pageSize?: number
+}
+
+export interface AuditLogResponse {
+  logs: AuditLogDto[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
 }

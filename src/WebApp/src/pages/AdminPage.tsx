@@ -188,6 +188,14 @@ export default function AdminPage() {
             </button>
             
             <button
+              onClick={() => navigate('/audit')}
+              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              <Database className="h-5 w-5" />
+              <span>Audit Trail</span>
+            </button>
+            
+            <button
               onClick={handleLogout}
               className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
@@ -422,6 +430,14 @@ export default function AdminPage() {
             >
               <Settings className="h-5 w-5 mr-2 text-purple-600" />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">System Debug</span>
+            </button>
+            
+            <button
+              onClick={() => navigate('/audit')}
+              className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Database className="h-5 w-5 mr-2 text-indigo-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Audit Trail</span>
             </button>
             
             <button
