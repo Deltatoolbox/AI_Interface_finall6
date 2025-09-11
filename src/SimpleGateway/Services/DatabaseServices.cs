@@ -954,8 +954,11 @@ public class HealthMonitoringService : IHealthMonitoringService
         // Initialize service statuses
         InitializeServiceStatuses();
         
+        // Start initial health check immediately
+        _ = Task.Run(async () => await StartHealthMonitoringAsync());
+        
         // Start monitoring timer (every 30 seconds)
-        _monitoringTimer = new Timer(async _ => await UpdateSystemMetrics(), null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+        _monitoringTimer = new Timer(async _ => await UpdateSystemMetrics(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
     }
 
     private void InitializeServiceStatuses()
@@ -971,7 +974,7 @@ public class HealthMonitoringService : IHealthMonitoringService
 
         foreach (var service in services)
         {
-            _serviceStatuses[service] = new ServiceStatus(service, "Unknown", DateTime.UtcNow);
+            _serviceStatuses[service] = new ServiceStatus(service, "Checking...", DateTime.UtcNow);
         }
     }
 
@@ -1079,16 +1082,10 @@ public class HealthMonitoringService : IHealthMonitoringService
     {
         try
         {
-            // Update service statuses
+            // Update service statuses by calling health checks
             foreach (var service in _serviceStatuses.Keys.ToList())
             {
-                var isHealthy = await CheckServiceHealthAsync(service);
-                var status = isHealthy ? "Healthy" : "Unhealthy";
-                
-                lock (_lock)
-                {
-                    _serviceStatuses[service] = new ServiceStatus(service, status, DateTime.UtcNow);
-                }
+                await CheckServiceHealthAsync(service);
             }
         }
         catch (Exception ex)
@@ -1115,12 +1112,13 @@ public class HealthMonitoringService : IHealthMonitoringService
         try
         {
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            httpClient.Timeout = TimeSpan.FromSeconds(3);
             var response = await httpClient.GetAsync("http://localhost:1234/v1/models");
             return response.IsSuccessStatusCode;
         }
         catch
         {
+            // LM Studio is not running, which is expected in many cases
             return false;
         }
     }
