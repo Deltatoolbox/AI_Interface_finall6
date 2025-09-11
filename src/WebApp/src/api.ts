@@ -52,7 +52,7 @@ export const api = {
 
   // Admin User Management APIs
   async getUsers() {
-    const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+    const response = await fetch(`${API_BASE_URL}/api/users/with-roles`, {
       credentials: 'include',
     })
     if (!response.ok) throw new Error('Failed to fetch users')
@@ -67,6 +67,65 @@ export const api = {
       body: JSON.stringify({ username, password, email, role }),
     })
     if (!response.ok) throw new Error('Failed to create user')
+    return response.json()
+  },
+
+  // Role Management APIs
+  async getRoles() {
+    const response = await fetch(`${API_BASE_URL}/api/roles`, {
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to fetch roles')
+    return response.json()
+  },
+
+  async getRolePermissions() {
+    const response = await fetch(`${API_BASE_URL}/api/roles/permissions`, {
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to fetch permissions')
+    return response.json()
+  },
+
+  async createRole(name: string, description: string, permissions: string[]) {
+    const response = await fetch(`${API_BASE_URL}/api/roles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name, description, permissions }),
+    })
+    if (!response.ok) throw new Error('Failed to create role')
+    return response.json()
+  },
+
+  async updateRole(roleId: string, name: string, description: string, permissions: string[]) {
+    const response = await fetch(`${API_BASE_URL}/api/roles/${roleId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name, description, permissions }),
+    })
+    if (!response.ok) throw new Error('Failed to update role')
+    return response.json()
+  },
+
+  async deleteRole(roleId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/roles/${roleId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to delete role')
+    return response.json()
+  },
+
+  async assignRoleToUser(userId: string, roleId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/roles/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ userId, roleId }),
+    })
+    if (!response.ok) throw new Error('Failed to assign role')
     return response.json()
   },
 

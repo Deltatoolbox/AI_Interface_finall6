@@ -13,17 +13,17 @@
 ## 🔧 **System Features**
 - [x] **Model Management** - Verschiedene LM Studio Models pro Conversation auswählen ✅
 - [ ] **Backup/Restore** - Automatische Datenbank-Backups
-- [x] **Health Monitoring** - System-Performance Dashboard erweitern
-- [ ] **Logging/Audit Trail** - Wer hat was wann gemacht, einsehbar im debug channel
+- [x] **Health Monitoring** - System-Performance Dashboard erweitern ✅
+- [x] **Logging/Audit Trail** - Wer hat was wann gemacht, einsehbar im debug channel ✅
+- [x] **User Groups/Roles** - Mehrere Admin-Level, Moderatoren ✅
 
 ## 👥 **User Management**
-- [ ] **User Groups/Roles** - Mehrere Admin-Level, Moderatoren
-- [ ] **Guest Mode** - Temporäre Accounts ohne Registrierung
-- [ ] **SSO Integration** - LDAP/Active Directory Anbindung
-- [ ] **User Profiles** - Avatare, Bio, Präferenzen
+- [x] **Guest Mode** - Temporäre Accounts ohne Registrierung ✅
+- [x] **SSO Integration** - LDAP/Active Directory Anbindung ✅
+- [x] **User Profiles** - Avatare, Bio, Präferenzen ✅
 
 ## 🔒 **Security & Privacy**
-- [ ] **End-to-End Encryption** - Conversations verschlüsselt speichern
+- [ ] **End-to-End Encryption** - Conversations verschlüsselt speichern, https soll verwendet werden
 - [ ] **GDPR Compliance** - Datenexport, Löschung, Einverständniserklärungen
 - [ ] **Session Management** - Aktive Sessions verwalten
 - [ ] **Two-Factor Authentication** - 2FA für alle User (optional, nie Pflicht)
