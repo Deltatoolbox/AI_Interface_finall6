@@ -30,6 +30,7 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.PasswordHash).IsRequired();
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.Role).HasMaxLength(20).HasDefaultValue("User");
+            entity.Property(e => e.SessionId).HasMaxLength(100);
             
             entity.HasOne(e => e.UserRole)
                   .WithMany(e => e.Users)

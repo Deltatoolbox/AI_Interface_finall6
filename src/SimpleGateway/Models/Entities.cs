@@ -21,6 +21,10 @@ public class User
     
     public string? RoleId { get; set; }
     
+    public bool IsGuest { get; set; } = false;
+    public string? SessionId { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     

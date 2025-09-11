@@ -54,6 +54,7 @@ builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddScoped<IHealthMonitoringService, HealthMonitoringService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IUserRoleService, UserRoleService>();
+builder.Services.AddScoped<IGuestService, GuestService>();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -1345,6 +1346,133 @@ app.MapGet("/api/users/with-roles", async (HttpContext context, IUserService use
     {
         Console.WriteLine($"Error getting users with roles: {ex.Message}");
         return Results.Problem("Failed to get users with roles");
+    }
+});
+
+// Guest Mode Endpoints
+app.MapPost("/api/guest/create", async (CreateGuestRequest request, HttpContext context, IGuestService guestService) =>
+{
+    try
+    {
+        var guestUser = await guestService.CreateGuestUserAsync(request);
+        return Results.Created($"/api/guest/{guestUser.SessionId}", guestUser);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error creating guest user: {ex.Message}");
+        return Results.Problem("Failed to create guest user");
+    }
+});
+
+app.MapGet("/api/guest/{sessionId}", async (string sessionId, IGuestService guestService) =>
+{
+    try
+    {
+        var guestUser = await guestService.GetGuestUserBySessionIdAsync(sessionId);
+        if (guestUser == null)
+            return Results.NotFound();
+
+        return Results.Ok(guestUser);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting guest user: {ex.Message}");
+        return Results.Problem("Failed to get guest user");
+    }
+});
+
+app.MapPost("/api/guest/{sessionId}/extend", async (string sessionId, int hours, IGuestService guestService) =>
+{
+    try
+    {
+        var success = await guestService.ExtendGuestSessionAsync(sessionId, hours);
+        if (!success)
+            return Results.NotFound();
+
+        return Results.Ok(new { success = true, message = $"Session extended by {hours} hours" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error extending guest session: {ex.Message}");
+        return Results.Problem("Failed to extend guest session");
+    }
+});
+
+app.MapPost("/api/guest/{sessionId}/deactivate", async (string sessionId, IGuestService guestService) =>
+{
+    try
+    {
+        var success = await guestService.DeactivateGuestUserAsync(sessionId);
+        if (!success)
+            return Results.NotFound();
+
+        return Results.Ok(new { success = true, message = "Guest session deactivated" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deactivating guest session: {ex.Message}");
+        return Results.Problem("Failed to deactivate guest session");
+    }
+});
+
+app.MapPost("/api/guest/convert", async (ConvertGuestRequest request, IGuestService guestService) =>
+{
+    try
+    {
+        var success = await guestService.ConvertGuestToUserAsync(request.SessionId, request.Username, request.Password, request.Email);
+        if (!success)
+            return Results.BadRequest("Failed to convert guest to user. Username may already exist.");
+
+        return Results.Ok(new { success = true, message = "Guest successfully converted to user" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error converting guest to user: {ex.Message}");
+        return Results.Problem("Failed to convert guest to user");
+    }
+});
+
+app.MapGet("/api/guest/active", async (HttpContext context, IUserService userService, IGuestService guestService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    // Only admins can view active guests
+    if (user.Role != "Admin" && user.Role != "SuperAdmin")
+        return Results.Forbid();
+
+    try
+    {
+        var activeGuests = await guestService.GetActiveGuestsAsync();
+        return Results.Ok(activeGuests);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting active guests: {ex.Message}");
+        return Results.Problem("Failed to get active guests");
+    }
+});
+
+app.MapPost("/api/guest/cleanup", async (GuestCleanupRequest request, HttpContext context, IUserService userService, IGuestService guestService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    // Only admins can cleanup guests
+    if (user.Role != "Admin" && user.Role != "SuperAdmin")
+        return Results.Forbid();
+
+    try
+    {
+        var cleanedCount = await guestService.CleanupExpiredGuestsAsync(request.MaxAgeHours);
+        return Results.Ok(new { success = true, cleanedCount, message = $"Cleaned up {cleanedCount} expired guest accounts" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error cleaning up guests: {ex.Message}");
+        return Results.Problem("Failed to cleanup guests");
     }
 });
 

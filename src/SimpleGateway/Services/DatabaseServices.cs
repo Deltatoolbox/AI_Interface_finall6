@@ -104,6 +104,18 @@ public interface IUserRoleService
     Task InitializeDefaultRolesAsync();
 }
 
+public interface IGuestService
+{
+    Task<GuestUser> CreateGuestUserAsync(CreateGuestRequest request);
+    Task<GuestUser?> GetGuestUserBySessionIdAsync(string sessionId);
+    Task<bool> ExtendGuestSessionAsync(string sessionId, int additionalHours = 24);
+    Task<bool> DeactivateGuestUserAsync(string sessionId);
+    Task<int> CleanupExpiredGuestsAsync(int maxAgeHours = 24);
+    Task<GuestUser[]> GetActiveGuestsAsync();
+    Task<bool> IsGuestSessionValidAsync(string sessionId);
+    Task<bool> ConvertGuestToUserAsync(string sessionId, string username, string password, string email);
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -1705,5 +1717,195 @@ public class MessageService : IMessageService
         }
 
         await _context.SaveChangesAsync();
+    }
+}
+
+public class GuestService : IGuestService
+{
+    private readonly GatewayDbContext _context;
+
+    public GuestService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<GuestUser> CreateGuestUserAsync(CreateGuestRequest request)
+    {
+        var expiresAt = DateTime.UtcNow.AddHours(24); // Default 24 hours
+        
+        var guestUser = new User
+        {
+            Username = $"guest_{request.SessionId}",
+            PasswordHash = "", // No password for guests
+            Email = "",
+            Role = "Guest",
+            IsGuest = true,
+            SessionId = request.SessionId,
+            ExpiresAt = expiresAt,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(guestUser);
+        await _context.SaveChangesAsync();
+
+        return new GuestUser(
+            guestUser.Id,
+            guestUser.SessionId!,
+            guestUser.CreatedAt,
+            guestUser.ExpiresAt!.Value,
+            request.IpAddress,
+            request.UserAgent,
+            true
+        );
+    }
+
+    public async Task<GuestUser?> GetGuestUserBySessionIdAsync(string sessionId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.SessionId == sessionId && u.IsGuest);
+
+        if (user == null) return null;
+
+        return new GuestUser(
+            user.Id,
+            user.SessionId!,
+            user.CreatedAt,
+            user.ExpiresAt!.Value,
+            "", // IP and UserAgent not stored in User entity
+            "",
+            user.ExpiresAt > DateTime.UtcNow
+        );
+    }
+
+    public async Task<bool> ExtendGuestSessionAsync(string sessionId, int additionalHours = 24)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.SessionId == sessionId && u.IsGuest);
+
+        if (user == null) return false;
+
+        user.ExpiresAt = DateTime.UtcNow.AddHours(additionalHours);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeactivateGuestUserAsync(string sessionId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.SessionId == sessionId && u.IsGuest);
+
+        if (user == null) return false;
+
+        user.ExpiresAt = DateTime.UtcNow.AddMinutes(-1); // Expire immediately
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<int> CleanupExpiredGuestsAsync(int maxAgeHours = 24)
+    {
+        var cutoffTime = DateTime.UtcNow.AddHours(-maxAgeHours);
+        
+        var expiredGuests = await _context.Users
+            .Where(u => u.IsGuest && (u.ExpiresAt < DateTime.UtcNow || u.CreatedAt < cutoffTime))
+            .ToListAsync();
+
+        if (expiredGuests.Any())
+        {
+            // Delete related data first
+            var guestIds = expiredGuests.Select(g => g.Id).ToList();
+            
+            // Delete conversations
+            var conversations = await _context.Conversations
+                .Where(c => guestIds.Contains(c.UserId))
+                .ToListAsync();
+            _context.Conversations.RemoveRange(conversations);
+
+            // Delete messages
+            var conversationIds = conversations.Select(c => c.Id).ToList();
+            if (conversationIds.Any())
+            {
+                var messages = await _context.Messages
+                    .Where(m => conversationIds.Contains(m.ConversationId))
+                    .ToListAsync();
+                _context.Messages.RemoveRange(messages);
+            }
+
+            // Delete shares
+            var shares = await _context.Shares
+                .Where(s => guestIds.Contains(s.SharedByUserId))
+                .ToListAsync();
+            _context.Shares.RemoveRange(shares);
+
+            // Delete audit logs
+            var auditLogs = await _context.AuditLogs
+                .Where(a => guestIds.Contains(a.UserId))
+                .ToListAsync();
+            _context.AuditLogs.RemoveRange(auditLogs);
+
+            // Finally delete the guest users
+            _context.Users.RemoveRange(expiredGuests);
+            await _context.SaveChangesAsync();
+        }
+
+        return expiredGuests.Count;
+    }
+
+    public async Task<GuestUser[]> GetActiveGuestsAsync()
+    {
+        var guests = await _context.Users
+            .Where(u => u.IsGuest && u.ExpiresAt > DateTime.UtcNow)
+            .OrderBy(u => u.CreatedAt)
+            .Select(u => new GuestUser(
+                u.Id,
+                u.SessionId!,
+                u.CreatedAt,
+                u.ExpiresAt!.Value,
+                "", // IP and UserAgent not stored
+                "",
+                true
+            ))
+            .ToArrayAsync();
+
+        return guests;
+    }
+
+    public async Task<bool> IsGuestSessionValidAsync(string sessionId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.SessionId == sessionId && u.IsGuest);
+
+        return user != null && user.ExpiresAt > DateTime.UtcNow;
+    }
+
+    public async Task<bool> ConvertGuestToUserAsync(string sessionId, string username, string password, string email)
+    {
+        var guestUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.SessionId == sessionId && u.IsGuest);
+
+        if (guestUser == null) return false;
+
+        // Check if username already exists
+        var existingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.Username == username && !u.IsGuest);
+
+        if (existingUser != null) return false;
+
+        // Convert guest to regular user
+        guestUser.Username = username;
+        guestUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        guestUser.Email = email;
+        guestUser.Role = "User";
+        guestUser.IsGuest = false;
+        guestUser.SessionId = null;
+        guestUser.ExpiresAt = null;
+        guestUser.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
     }
 }

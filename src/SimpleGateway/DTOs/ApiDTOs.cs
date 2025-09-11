@@ -76,3 +76,10 @@ public record UpdateUserRoleRequest(string Name, string Description, string[] Pe
 public record AssignRoleRequest(string UserId, string RoleId);
 public record UserWithRole(string Id, string Username, string Email, string Role, string RoleId, DateTime CreatedAt, DateTime LastLoginAt);
 public record RolePermission(string Name, string Description, string Category);
+
+// Guest Mode DTOs
+public record GuestUser(string Id, string SessionId, DateTime CreatedAt, DateTime ExpiresAt, string IpAddress, string UserAgent, bool IsActive);
+public record CreateGuestRequest(string SessionId, string IpAddress, string UserAgent);
+public record GuestSession(string SessionId, string UserId, DateTime CreatedAt, DateTime ExpiresAt, bool IsActive);
+public record GuestCleanupRequest(int MaxAgeHours = 24);
+public record ConvertGuestRequest(string SessionId, string Username, string Password, string Email);
