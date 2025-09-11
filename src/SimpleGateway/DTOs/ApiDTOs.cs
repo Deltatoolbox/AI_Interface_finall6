@@ -52,3 +52,8 @@ public record ShareAccessRequest(string ShareId, string? Password = null);
 public record ChatTemplateDto(string Id, string Name, string Description, string Category, string SystemPrompt, string[] ExampleMessages, bool IsBuiltIn);
 public record CreateTemplateRequest(string Name, string Description, string Category, string SystemPrompt, string[] ExampleMessages);
 public record ApplyTemplateRequest(string TemplateId, string? CustomPrompt = null);
+
+// Backup/Restore DTOs
+public record BackupInfo(string Id, string Name, DateTime CreatedAt, long SizeBytes, string Description);
+public record CreateBackupRequest(string Name, string? Description = null);
+public record RestoreBackupRequest(string BackupId);

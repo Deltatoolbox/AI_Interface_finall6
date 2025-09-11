@@ -11,6 +11,7 @@ import UserManagementPage from './pages/UserManagementPage'
 import DebugPage from './pages/DebugPage'
 import SearchPage from './pages/SearchPage'
 import SharedConversationPage from './pages/SharedConversationPage'
+import BackupManagementPage from './pages/BackupManagementPage'
 
 function App() {
   return (
@@ -48,6 +49,14 @@ function App() {
         <Route 
           path="/shared/:shareId" 
           element={<SharedConversationPage />} 
+        />
+        <Route 
+          path="/backups" 
+          element={
+            <ProtectedRoute>
+              <BackupManagementPage />
+            </ProtectedRoute>
+          } 
         />
           <Route 
             path="/admin" 

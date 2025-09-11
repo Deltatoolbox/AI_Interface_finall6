@@ -279,5 +279,68 @@ export const api = {
     })
     if (!response.ok) throw new Error('Failed to seed built-in templates')
     return response.json()
+  },
+
+  // Backup/Restore API
+  async getBackups() {
+    const response = await fetch(`${API_BASE_URL}/api/backups`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to get backups')
+    return response.json()
+  },
+
+  async createBackup(name: string, description?: string) {
+    const response = await fetch(`${API_BASE_URL}/api/backups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ name, description }),
+    })
+    if (!response.ok) throw new Error('Failed to create backup')
+    return response.json()
+  },
+
+  async restoreBackup(backupId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/backups/${backupId}/restore`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to restore backup')
+    return response.json()
+  },
+
+  async deleteBackup(backupId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/backups/${backupId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to delete backup')
+    return response.json()
+  },
+
+  async downloadBackup(backupId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/backups/${backupId}/download`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to download backup')
+    return response.blob()
+  },
+
+  async uploadBackup(file: File, name: string, description?: string) {
+    const formData = new FormData()
+    formData.append('backup', file)
+    formData.append('name', name)
+    if (description) formData.append('description', description)
+
+    const response = await fetch(`${API_BASE_URL}/api/backups/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    })
+    if (!response.ok) throw new Error('Failed to upload backup')
+    return response.json()
   }
 }

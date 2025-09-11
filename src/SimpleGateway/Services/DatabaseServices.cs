@@ -54,6 +54,17 @@ public interface IChatTemplateService
     Task SeedBuiltInTemplatesAsync();
 }
 
+public interface IBackupService
+{
+    Task<BackupInfo[]> GetBackupsAsync();
+    Task<BackupInfo> CreateBackupAsync(string name, string? description = null);
+    Task<bool> RestoreBackupAsync(string backupId);
+    Task<bool> DeleteBackupAsync(string backupId);
+    Task<byte[]> DownloadBackupAsync(string backupId);
+    Task<bool> UploadBackupAsync(string name, string? description, byte[] backupData);
+    Task ScheduleAutomaticBackupsAsync();
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -637,6 +648,184 @@ public class ChatTemplateService : IChatTemplateService
             exampleMessages,
             template.IsBuiltIn
         );
+    }
+}
+
+public class BackupService : IBackupService
+{
+    private readonly GatewayDbContext _context;
+    private readonly string _backupDirectory;
+    private readonly Timer? _backupTimer;
+
+    public BackupService(GatewayDbContext context)
+    {
+        _context = context;
+        _backupDirectory = Path.Combine(Directory.GetCurrentDirectory(), "backups");
+        
+        // Ensure backup directory exists
+        if (!Directory.Exists(_backupDirectory))
+        {
+            Directory.CreateDirectory(_backupDirectory);
+        }
+
+        // Schedule automatic backups every 24 hours
+        _backupTimer = new Timer(async _ => await CreateAutomaticBackup(), null, TimeSpan.FromHours(24), TimeSpan.FromHours(24));
+    }
+
+    public async Task<BackupInfo[]> GetBackupsAsync()
+    {
+        var backupFiles = Directory.GetFiles(_backupDirectory, "*.db")
+            .Select(filePath =>
+            {
+                var fileInfo = new FileInfo(filePath);
+                var fileName = Path.GetFileNameWithoutExtension(filePath);
+                return new BackupInfo(
+                    fileName,
+                    fileName,
+                    fileInfo.CreationTime,
+                    fileInfo.Length,
+                    $"Backup created on {fileInfo.CreationTime:yyyy-MM-dd HH:mm}"
+                );
+            })
+            .OrderByDescending(b => b.CreatedAt)
+            .ToArray();
+
+        return backupFiles;
+    }
+
+    public async Task<BackupInfo> CreateBackupAsync(string name, string? description = null)
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        var backupFileName = $"{name}_{timestamp}.db";
+        var backupPath = Path.Combine(_backupDirectory, backupFileName);
+
+        // Copy the current database file
+        var sourceDbPath = Path.Combine(Directory.GetCurrentDirectory(), "gateway.db");
+        if (File.Exists(sourceDbPath))
+        {
+            File.Copy(sourceDbPath, backupPath, true);
+        }
+        else
+        {
+            throw new FileNotFoundException("Source database file not found");
+        }
+
+        var fileInfo = new FileInfo(backupPath);
+        return new BackupInfo(
+            Path.GetFileNameWithoutExtension(backupFileName),
+            name,
+            fileInfo.CreationTime,
+            fileInfo.Length,
+            description ?? $"Manual backup created on {fileInfo.CreationTime:yyyy-MM-dd HH:mm}"
+        );
+    }
+
+    public async Task<bool> RestoreBackupAsync(string backupId)
+    {
+        var backupPath = Path.Combine(_backupDirectory, $"{backupId}.db");
+        if (!File.Exists(backupPath))
+        {
+            return false;
+        }
+
+        var targetDbPath = Path.Combine(Directory.GetCurrentDirectory(), "gateway.db");
+        
+        // Create a backup of current database before restoring
+        var currentBackupPath = $"{targetDbPath}.backup_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+        if (File.Exists(targetDbPath))
+        {
+            File.Copy(targetDbPath, currentBackupPath, true);
+        }
+
+        // Restore the backup
+        File.Copy(backupPath, targetDbPath, true);
+        
+        return true;
+    }
+
+    public async Task<bool> DeleteBackupAsync(string backupId)
+    {
+        var backupPath = Path.Combine(_backupDirectory, $"{backupId}.db");
+        if (!File.Exists(backupPath))
+        {
+            return false;
+        }
+
+        File.Delete(backupPath);
+        return true;
+    }
+
+    public async Task<byte[]> DownloadBackupAsync(string backupId)
+    {
+        var backupPath = Path.Combine(_backupDirectory, $"{backupId}.db");
+        if (!File.Exists(backupPath))
+        {
+            throw new FileNotFoundException("Backup file not found");
+        }
+
+        return await File.ReadAllBytesAsync(backupPath);
+    }
+
+    public async Task<bool> UploadBackupAsync(string name, string? description, byte[] backupData)
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+        var backupFileName = $"{name}_{timestamp}.db";
+        var backupPath = Path.Combine(_backupDirectory, backupFileName);
+
+        await File.WriteAllBytesAsync(backupPath, backupData);
+        return true;
+    }
+
+    public async Task ScheduleAutomaticBackupsAsync()
+    {
+        // This is handled by the timer in the constructor
+        await Task.CompletedTask;
+    }
+
+    private async Task CreateAutomaticBackup()
+    {
+        try
+        {
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            var backupFileName = $"auto_backup_{timestamp}.db";
+            var backupPath = Path.Combine(_backupDirectory, backupFileName);
+
+            var sourceDbPath = Path.Combine(Directory.GetCurrentDirectory(), "gateway.db");
+            if (File.Exists(sourceDbPath))
+            {
+                File.Copy(sourceDbPath, backupPath, true);
+                
+                // Clean up old automatic backups (keep only last 7 days)
+                await CleanupOldBackups();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating automatic backup: {ex.Message}");
+        }
+    }
+
+    private async Task CleanupOldBackups()
+    {
+        try
+        {
+            var cutoffDate = DateTime.UtcNow.AddDays(-7);
+            var oldBackups = Directory.GetFiles(_backupDirectory, "auto_backup_*.db")
+                .Where(filePath =>
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    return fileInfo.CreationTime < cutoffDate;
+                });
+
+            foreach (var oldBackup in oldBackups)
+            {
+                File.Delete(oldBackup);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cleaning up old backups: {ex.Message}");
+        }
     }
 }
 

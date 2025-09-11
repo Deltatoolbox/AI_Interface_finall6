@@ -50,6 +50,7 @@ builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<IChatTemplateService, ChatTemplateService>();
+builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -901,6 +902,136 @@ app.MapPost("/api/templates/seed", async (IChatTemplateService templateService) 
     {
         Console.WriteLine($"Error seeding templates: {ex.Message}");
         return Results.Problem("Failed to seed templates");
+    }
+});
+
+// Backup/Restore Endpoints
+app.MapGet("/api/backups", async (IBackupService backupService) =>
+{
+    try
+    {
+        var backups = await backupService.GetBackupsAsync();
+        return Results.Ok(backups);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting backups: {ex.Message}");
+        return Results.Problem("Failed to get backups");
+    }
+});
+
+app.MapPost("/api/backups", async (CreateBackupRequest request, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var backup = await backupService.CreateBackupAsync(request.Name, request.Description);
+        return Results.Created($"/api/backups/{backup.Id}", backup);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error creating backup: {ex.Message}");
+        return Results.Problem("Failed to create backup");
+    }
+});
+
+app.MapPost("/api/backups/{backupId}/restore", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var success = await backupService.RestoreBackupAsync(backupId);
+        if (!success)
+            return Results.NotFound("Backup not found");
+
+        return Results.Ok(new { message = "Backup restored successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error restoring backup: {ex.Message}");
+        return Results.Problem("Failed to restore backup");
+    }
+});
+
+app.MapDelete("/api/backups/{backupId}", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var success = await backupService.DeleteBackupAsync(backupId);
+        if (!success)
+            return Results.NotFound("Backup not found");
+
+        return Results.Ok(new { message = "Backup deleted successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting backup: {ex.Message}");
+        return Results.Problem("Failed to delete backup");
+    }
+});
+
+app.MapGet("/api/backups/{backupId}/download", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var backupData = await backupService.DownloadBackupAsync(backupId);
+        return Results.File(backupData, "application/octet-stream", $"{backupId}.db");
+    }
+    catch (FileNotFoundException)
+    {
+        return Results.NotFound("Backup file not found");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error downloading backup: {ex.Message}");
+        return Results.Problem("Failed to download backup");
+    }
+});
+
+app.MapPost("/api/backups/upload", async (HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    try
+    {
+        var form = await context.Request.ReadFormAsync();
+        var file = form.Files["backup"];
+        var name = form["name"].ToString();
+        var description = form["description"].ToString();
+
+        if (file == null || string.IsNullOrEmpty(name))
+            return Results.BadRequest("Backup file and name are required");
+
+        using var memoryStream = new MemoryStream();
+        await file.CopyToAsync(memoryStream);
+        var backupData = memoryStream.ToArray();
+
+        var success = await backupService.UploadBackupAsync(name, description, backupData);
+        if (!success)
+            return Results.Problem("Failed to upload backup");
+
+        return Results.Ok(new { message = "Backup uploaded successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error uploading backup: {ex.Message}");
+        return Results.Problem("Failed to upload backup");
     }
 });
 
