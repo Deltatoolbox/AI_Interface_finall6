@@ -19,6 +19,9 @@ public class GatewayDbContext : DbContext
     public DbSet<SsoConfig> SsoConfigs { get; set; }
     public DbSet<UserPreferences> UserPreferences { get; set; }
     public DbSet<EncryptionKey> EncryptionKeys { get; set; }
+    public DbSet<DataExport> DataExports { get; set; }
+    public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; }
+    public DbSet<ConsentRecord> ConsentRecords { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -187,6 +190,56 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.EncryptedPrivateKey).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // DataExport Configuration
+        modelBuilder.Entity<DataExport>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.DataTypes).IsRequired();
+            entity.Property(e => e.Format).IsRequired();
+            entity.Property(e => e.FilePath).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.ExpiresAt).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // DataDeletionRequest Configuration
+        modelBuilder.Entity<DataDeletionRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.Reason).IsRequired();
+            entity.Property(e => e.RequestedAt).IsRequired();
+            entity.Property(e => e.Status).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ConsentRecord Configuration
+        modelBuilder.Entity<ConsentRecord>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.ConsentType).IsRequired();
+            entity.Property(e => e.GrantedAt).IsRequired();
+            entity.Property(e => e.Purpose).IsRequired();
             
             entity.HasOne(e => e.User)
                   .WithMany()

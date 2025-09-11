@@ -40,6 +40,14 @@ public class User
     public bool EncryptionEnabled { get; set; } = false;
     public int KeyRotationDays { get; set; } = 90;
     
+    public bool DataCollectionConsent { get; set; } = false;
+    public bool AnalyticsConsent { get; set; } = false;
+    public bool MarketingConsent { get; set; } = false;
+    public bool ThirdPartySharingConsent { get; set; } = false;
+    public DateTime? LastConsentUpdate { get; set; }
+    public bool DataDeletionRequested { get; set; } = false;
+    public DateTime? DataDeletionRequestedAt { get; set; }
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
@@ -258,4 +266,59 @@ public class EncryptionKey
     // Navigation Properties
     public virtual User User { get; set; } = null!;
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
+}
+
+public class DataExport
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+    [Required]
+    public string DataTypes { get; set; } = string.Empty; // JSON array
+    [Required]
+    public string Format { get; set; } = "json";
+    [Required]
+    public string FilePath { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ExpiresAt { get; set; }
+    public bool IsDownloaded { get; set; } = false;
+    public DateTime? DownloadedAt { get; set; }
+    
+    // Navigation Properties
+    public virtual User User { get; set; } = null!;
+}
+
+public class DataDeletionRequest
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+    [Required]
+    public string Reason { get; set; } = string.Empty;
+    public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+    [Required]
+    public string Status { get; set; } = "pending"; // pending, processing, completed, failed
+    public string? AdminNotes { get; set; }
+    
+    // Navigation Properties
+    public virtual User User { get; set; } = null!;
+}
+
+public class ConsentRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string UserId { get; set; } = string.Empty;
+    [Required]
+    public string ConsentType { get; set; } = string.Empty;
+    public bool Granted { get; set; } = false;
+    public DateTime GrantedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? RevokedAt { get; set; }
+    [Required]
+    public string Purpose { get; set; } = string.Empty;
+    public string? LegalBasis { get; set; }
+    
+    // Navigation Properties
+    public virtual User User { get; set; } = null!;
 }

@@ -103,3 +103,14 @@ public record EncryptedMessage(string MessageId, string ConversationId, string E
 public record DecryptMessageRequest(string EncryptedContent, string EncryptionKeyId, string Iv, string Tag);
 public record EncryptionStatus(string UserId, bool HasActiveKey, DateTime? KeyExpiresAt, bool EncryptionEnabled);
 public record UpdateEncryptionSettingsRequest(bool? EncryptionEnabled, int? KeyRotationDays = 90);
+
+// GDPR Compliance DTOs
+public record DataExportRequest(string UserId, string[] DataTypes, string Format = "json");
+public record DataExportResponse(string ExportId, string UserId, string DownloadUrl, DateTime CreatedAt, DateTime ExpiresAt);
+public record DataDeletionRequestDto(string UserId, string Reason, bool ConfirmDeletion);
+public record DataDeletionResponse(string RequestId, string UserId, DateTime RequestedAt, DateTime? CompletedAt, string Status);
+public record ConsentRecordDto(string Id, string UserId, string ConsentType, bool Granted, DateTime GrantedAt, DateTime? RevokedAt, string Purpose);
+public record ConsentRequest(string UserId, string ConsentType, bool Granted, string Purpose);
+public record PrivacySettings(string UserId, bool DataCollection, bool Analytics, bool Marketing, bool ThirdPartySharing, DateTime UpdatedAt);
+public record UpdatePrivacySettingsRequest(bool? DataCollection, bool? Analytics, bool? Marketing, bool? ThirdPartySharing);
+public record GdprStatus(string UserId, bool HasConsented, DateTime? LastConsentUpdate, bool DataExportAvailable, bool DataDeletionRequested);

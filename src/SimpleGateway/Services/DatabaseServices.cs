@@ -154,6 +154,25 @@ public interface IEncryptionService
     Task<bool> IsEncryptionEnabledAsync(string userId);
 }
 
+public interface IGdprService
+{
+    Task<DataExportResponse> CreateDataExportAsync(DataExportRequest request);
+    Task<DataExportResponse?> GetDataExportAsync(string exportId);
+    Task<DataExportResponse[]> GetUserDataExportsAsync(string userId);
+    Task<bool> DeleteExpiredExportsAsync();
+    Task<DataDeletionResponse> RequestDataDeletionAsync(DataDeletionRequestDto request);
+    Task<DataDeletionResponse[]> GetDataDeletionRequestsAsync(string userId);
+    Task<DataDeletionResponse[]> GetAllDataDeletionRequestsAsync();
+    Task<bool> ProcessDataDeletionAsync(string requestId, string adminNotes);
+    Task<ConsentRecordDto> RecordConsentAsync(ConsentRequest request);
+    Task<ConsentRecordDto[]> GetUserConsentsAsync(string userId);
+    Task<bool> RevokeConsentAsync(string consentId);
+    Task<PrivacySettings> GetPrivacySettingsAsync(string userId);
+    Task<bool> UpdatePrivacySettingsAsync(string userId, UpdatePrivacySettingsRequest request);
+    Task<GdprStatus> GetGdprStatusAsync(string userId);
+    Task<bool> DeleteUserDataAsync(string userId);
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -2555,5 +2574,342 @@ public class EncryptionService : IEncryptionService
             .FirstOrDefaultAsync(u => u.Id == userId);
 
         return user?.EncryptionEnabled ?? false;
+    }
+}
+
+public class GdprService : IGdprService
+{
+    private readonly GatewayDbContext _context;
+
+    public GdprService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<DataExportResponse> CreateDataExportAsync(DataExportRequest request)
+    {
+        var expiresAt = DateTime.UtcNow.AddDays(30); // Exports expire after 30 days
+        var exportId = Guid.NewGuid().ToString();
+        var fileName = $"data_export_{request.UserId}_{exportId}.{request.Format}";
+        var filePath = Path.Combine("exports", fileName);
+
+        // Ensure exports directory exists
+        Directory.CreateDirectory("exports");
+
+        // Create export record
+        var dataExport = new Models.DataExport
+        {
+            Id = exportId,
+            UserId = request.UserId,
+            DataTypes = System.Text.Json.JsonSerializer.Serialize(request.DataTypes),
+            Format = request.Format,
+            FilePath = filePath,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = expiresAt
+        };
+
+        _context.DataExports.Add(dataExport);
+        await _context.SaveChangesAsync();
+
+        // Generate export file (placeholder implementation)
+        await GenerateExportFileAsync(dataExport, request);
+
+        return new DataExportResponse(
+            dataExport.Id,
+            dataExport.UserId,
+            $"/api/gdpr/exports/{dataExport.Id}/download",
+            dataExport.CreatedAt,
+            dataExport.ExpiresAt
+        );
+    }
+
+    public async Task<DataExportResponse?> GetDataExportAsync(string exportId)
+    {
+        var export = await _context.DataExports
+            .FirstOrDefaultAsync(e => e.Id == exportId);
+
+        if (export == null) return null;
+
+        return new DataExportResponse(
+            export.Id,
+            export.UserId,
+            $"/api/gdpr/exports/{export.Id}/download",
+            export.CreatedAt,
+            export.ExpiresAt
+        );
+    }
+
+    public async Task<DataExportResponse[]> GetUserDataExportsAsync(string userId)
+    {
+        var exports = await _context.DataExports
+            .Where(e => e.UserId == userId)
+            .OrderByDescending(e => e.CreatedAt)
+            .Select(e => new DataExportResponse(
+                e.Id,
+                e.UserId,
+                $"/api/gdpr/exports/{e.Id}/download",
+                e.CreatedAt,
+                e.ExpiresAt
+            ))
+            .ToArrayAsync();
+
+        return exports;
+    }
+
+    public async Task<bool> DeleteExpiredExportsAsync()
+    {
+        var expiredExports = await _context.DataExports
+            .Where(e => e.ExpiresAt <= DateTime.UtcNow)
+            .ToListAsync();
+
+        foreach (var export in expiredExports)
+        {
+            // Delete file if it exists
+            if (File.Exists(export.FilePath))
+            {
+                File.Delete(export.FilePath);
+            }
+        }
+
+        if (expiredExports.Any())
+        {
+            _context.DataExports.RemoveRange(expiredExports);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task<DataDeletionResponse> RequestDataDeletionAsync(DataDeletionRequestDto request)
+    {
+        var deletionRequest = new Models.DataDeletionRequest
+        {
+            UserId = request.UserId,
+            Reason = request.Reason,
+            RequestedAt = DateTime.UtcNow,
+            Status = "pending"
+        };
+
+        _context.DataDeletionRequests.Add(deletionRequest);
+        await _context.SaveChangesAsync();
+
+        return new DataDeletionResponse(
+            deletionRequest.Id,
+            deletionRequest.UserId,
+            deletionRequest.RequestedAt,
+            deletionRequest.CompletedAt,
+            deletionRequest.Status
+        );
+    }
+
+    public async Task<DataDeletionResponse[]> GetDataDeletionRequestsAsync(string userId)
+    {
+        var requests = await _context.DataDeletionRequests
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.RequestedAt)
+            .Select(r => new DataDeletionResponse(
+                r.Id,
+                r.UserId,
+                r.RequestedAt,
+                r.CompletedAt,
+                r.Status
+            ))
+            .ToArrayAsync();
+
+        return requests;
+    }
+
+    public async Task<DataDeletionResponse[]> GetAllDataDeletionRequestsAsync()
+    {
+        var requests = await _context.DataDeletionRequests
+            .OrderByDescending(r => r.RequestedAt)
+            .Select(r => new DataDeletionResponse(
+                r.Id,
+                r.UserId,
+                r.RequestedAt,
+                r.CompletedAt,
+                r.Status
+            ))
+            .ToArrayAsync();
+
+        return requests;
+    }
+
+    public async Task<bool> ProcessDataDeletionAsync(string requestId, string adminNotes)
+    {
+        var request = await _context.DataDeletionRequests
+            .FirstOrDefaultAsync(r => r.Id == requestId);
+
+        if (request == null) return false;
+
+        request.Status = "processing";
+        request.AdminNotes = adminNotes;
+        await _context.SaveChangesAsync();
+
+        // Process deletion (placeholder implementation)
+        await DeleteUserDataAsync(request.UserId);
+
+        request.Status = "completed";
+        request.CompletedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<ConsentRecordDto> RecordConsentAsync(ConsentRequest request)
+    {
+        var consent = new Models.ConsentRecord
+        {
+            UserId = request.UserId,
+            ConsentType = request.ConsentType,
+            Granted = request.Granted,
+            GrantedAt = DateTime.UtcNow,
+            Purpose = request.Purpose,
+            LegalBasis = "consent"
+        };
+
+        _context.ConsentRecords.Add(consent);
+        await _context.SaveChangesAsync();
+
+        return new ConsentRecordDto(
+            consent.Id,
+            consent.UserId,
+            consent.ConsentType,
+            consent.Granted,
+            consent.GrantedAt,
+            consent.RevokedAt,
+            consent.Purpose
+        );
+    }
+
+    public async Task<ConsentRecordDto[]> GetUserConsentsAsync(string userId)
+    {
+        var consents = await _context.ConsentRecords
+            .Where(c => c.UserId == userId)
+            .OrderByDescending(c => c.GrantedAt)
+            .Select(c => new ConsentRecordDto(
+                c.Id,
+                c.UserId,
+                c.ConsentType,
+                c.Granted,
+                c.GrantedAt,
+                c.RevokedAt,
+                c.Purpose
+            ))
+            .ToArrayAsync();
+
+        return consents;
+    }
+
+    public async Task<bool> RevokeConsentAsync(string consentId)
+    {
+        var consent = await _context.ConsentRecords
+            .FirstOrDefaultAsync(c => c.Id == consentId);
+
+        if (consent == null) return false;
+
+        consent.RevokedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<PrivacySettings> GetPrivacySettingsAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) throw new ArgumentException("User not found");
+
+        return new PrivacySettings(
+            userId,
+            user.DataCollectionConsent,
+            user.AnalyticsConsent,
+            user.MarketingConsent,
+            user.ThirdPartySharingConsent,
+            user.LastConsentUpdate ?? user.UpdatedAt
+        );
+    }
+
+    public async Task<bool> UpdatePrivacySettingsAsync(string userId, UpdatePrivacySettingsRequest request)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return false;
+
+        if (request.DataCollection.HasValue)
+            user.DataCollectionConsent = request.DataCollection.Value;
+
+        if (request.Analytics.HasValue)
+            user.AnalyticsConsent = request.Analytics.Value;
+
+        if (request.Marketing.HasValue)
+            user.MarketingConsent = request.Marketing.Value;
+
+        if (request.ThirdPartySharing.HasValue)
+            user.ThirdPartySharingConsent = request.ThirdPartySharing.Value;
+
+        user.LastConsentUpdate = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<GdprStatus> GetGdprStatusAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) throw new ArgumentException("User not found");
+
+        var hasConsented = user.DataCollectionConsent || user.AnalyticsConsent || user.MarketingConsent;
+        var hasDataExport = await _context.DataExports.AnyAsync(e => e.UserId == userId && e.ExpiresAt > DateTime.UtcNow);
+        var hasDeletionRequest = await _context.DataDeletionRequests.AnyAsync(r => r.UserId == userId && r.Status == "pending");
+
+        return new GdprStatus(
+            userId,
+            hasConsented,
+            user.LastConsentUpdate,
+            hasDataExport,
+            hasDeletionRequest
+        );
+    }
+
+    public async Task<bool> DeleteUserDataAsync(string userId)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null) return false;
+
+        // Delete all user data
+        user.DataDeletionRequested = true;
+        user.DataDeletionRequestedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    private async Task GenerateExportFileAsync(Models.DataExport export, DataExportRequest request)
+    {
+        // Placeholder implementation - in production, generate actual export file
+        var exportData = new
+        {
+            UserId = export.UserId,
+            ExportId = export.Id,
+            DataTypes = request.DataTypes,
+            Format = request.Format,
+            CreatedAt = export.CreatedAt,
+            ExpiresAt = export.ExpiresAt,
+            Message = "This is a placeholder export file. In production, this would contain actual user data."
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(exportData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(export.FilePath, json);
     }
 }
