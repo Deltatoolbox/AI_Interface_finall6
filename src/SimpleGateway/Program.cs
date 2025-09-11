@@ -943,9 +943,17 @@ app.MapPost("/api/templates/seed", async (IChatTemplateService templateService) 
     }
 });
 
-// Backup/Restore Endpoints
-app.MapGet("/api/backups", async (IBackupService backupService) =>
+// Admin Backup/Restore Endpoints
+app.MapGet("/api/admin/backups", async (HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    // Only admins can access backups
+    if (user.Role != "Admin")
+        return Results.Forbid();
+
     try
     {
         var backups = await backupService.GetBackupsAsync();
@@ -958,16 +966,20 @@ app.MapGet("/api/backups", async (IBackupService backupService) =>
     }
 });
 
-app.MapPost("/api/backups", async (CreateBackupRequest request, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/backups", async (CreateBackupRequest request, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
+    // Only admins can create backups
+    if (user.Role != "Admin")
+        return Results.Forbid();
+
     try
     {
         var backup = await backupService.CreateBackupAsync(request.Name, request.Description);
-        return Results.Created($"/api/backups/{backup.Id}", backup);
+        return Results.Created($"/api/admin/backups/{backup.Id}", backup);
     }
     catch (Exception ex)
     {
@@ -976,11 +988,15 @@ app.MapPost("/api/backups", async (CreateBackupRequest request, HttpContext cont
     }
 });
 
-app.MapPost("/api/backups/{backupId}/restore", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/backups/{backupId}/restore", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    // Only admins can restore backups
+    if (user.Role != "Admin")
+        return Results.Forbid();
 
     try
     {
@@ -997,11 +1013,15 @@ app.MapPost("/api/backups/{backupId}/restore", async (string backupId, HttpConte
     }
 });
 
-app.MapDelete("/api/backups/{backupId}", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapDelete("/api/admin/backups/{backupId}", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    // Only admins can delete backups
+    if (user.Role != "Admin")
+        return Results.Forbid();
 
     try
     {
@@ -1018,11 +1038,15 @@ app.MapDelete("/api/backups/{backupId}", async (string backupId, HttpContext con
     }
 });
 
-app.MapGet("/api/backups/{backupId}/download", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapGet("/api/admin/backups/{backupId}/download", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    // Only admins can download backups
+    if (user.Role != "Admin")
+        return Results.Forbid();
 
     try
     {
@@ -1040,11 +1064,15 @@ app.MapGet("/api/backups/{backupId}/download", async (string backupId, HttpConte
     }
 });
 
-app.MapPost("/api/backups/upload", async (HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/backups/upload", async (HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    // Only admins can upload backups
+    if (user.Role != "Admin")
+        return Results.Forbid();
 
     try
     {
