@@ -16,6 +16,7 @@ public class GatewayDbContext : DbContext
     public DbSet<ChatTemplate> ChatTemplates { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
+    public DbSet<SsoConfig> SsoConfigs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +32,8 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.Role).HasMaxLength(20).HasDefaultValue("User");
             entity.Property(e => e.SessionId).HasMaxLength(100);
+            entity.Property(e => e.SsoProvider).HasMaxLength(50);
+            entity.Property(e => e.SsoUsername).HasMaxLength(100);
             
             entity.HasOne(e => e.UserRole)
                   .WithMany(e => e.Users)
@@ -129,6 +132,22 @@ public class GatewayDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Description).HasMaxLength(200);
             entity.Property(e => e.Permissions).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired();
+        });
+
+        // SsoConfig Configuration
+        modelBuilder.Entity<SsoConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Provider).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ServerUrl).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.BaseDn).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.BindDn).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.BindPassword).IsRequired();
+            entity.Property(e => e.UserSearchFilter).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.GroupSearchFilter).HasMaxLength(500);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired();
         });

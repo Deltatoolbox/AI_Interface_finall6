@@ -83,3 +83,9 @@ public record CreateGuestRequest(string SessionId, string IpAddress, string User
 public record GuestSession(string SessionId, string UserId, DateTime CreatedAt, DateTime ExpiresAt, bool IsActive);
 public record GuestCleanupRequest(int MaxAgeHours = 24);
 public record ConvertGuestRequest(string SessionId, string Username, string Password, string Email);
+
+// SSO Integration DTOs
+public record SsoConfigDto(string Provider, string ServerUrl, string BaseDn, string BindDn, string BindPassword, string UserSearchFilter, string GroupSearchFilter, bool IsEnabled);
+public record SsoUser(string Username, string Email, string DisplayName, string[] Groups, string Provider);
+public record SsoLoginRequest(string Username, string Password, string Provider = "ldap");
+public record SsoUserMapping(string LocalUserId, string SsoUsername, string Provider, DateTime CreatedAt);

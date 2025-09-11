@@ -25,6 +25,10 @@ public class User
     public string? SessionId { get; set; }
     public DateTime? ExpiresAt { get; set; }
     
+    public bool IsSsoUser { get; set; } = false;
+    public string? SsoProvider { get; set; }
+    public string? SsoUsername { get; set; }
+    
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     
@@ -172,4 +176,31 @@ public class UserRole
     
     // Navigation Properties
     public virtual ICollection<User> Users { get; set; } = new List<User>();
+}
+
+public class SsoConfig
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    [MaxLength(50)]
+    public string Provider { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(200)]
+    public string ServerUrl { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(200)]
+    public string BaseDn { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(200)]
+    public string BindDn { get; set; } = string.Empty;
+    [Required]
+    public string BindPassword { get; set; } = string.Empty;
+    [Required]
+    [MaxLength(500)]
+    public string UserSearchFilter { get; set; } = string.Empty;
+    [MaxLength(500)]
+    public string GroupSearchFilter { get; set; } = string.Empty;
+    public bool IsEnabled { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

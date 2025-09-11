@@ -116,6 +116,19 @@ public interface IGuestService
     Task<bool> ConvertGuestToUserAsync(string sessionId, string username, string password, string email);
 }
 
+public interface ISsoService
+{
+    Task<SsoConfigDto?> GetSsoConfigAsync(string provider);
+    Task<SsoConfigDto> CreateSsoConfigAsync(SsoConfigDto config);
+    Task<SsoConfigDto> UpdateSsoConfigAsync(string provider, SsoConfigDto config);
+    Task<bool> DeleteSsoConfigAsync(string provider);
+    Task<SsoConfigDto[]> GetAllSsoConfigsAsync();
+    Task<SsoUser?> AuthenticateUserAsync(SsoLoginRequest request);
+    Task<User?> CreateOrUpdateSsoUserAsync(SsoUser ssoUser);
+    Task<bool> IsSsoEnabledAsync(string provider);
+    Task<SsoUserMapping[]> GetSsoUserMappingsAsync();
+}
+
 public interface IMessageService
 {
     Task SaveMessagesAsync(string conversationId, MessageDto[] messages);
@@ -1907,5 +1920,211 @@ public class GuestService : IGuestService
 
         await _context.SaveChangesAsync();
         return true;
+    }
+}
+
+public class SsoService : ISsoService
+{
+    private readonly GatewayDbContext _context;
+
+    public SsoService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<SsoConfigDto?> GetSsoConfigAsync(string provider)
+    {
+        var config = await _context.SsoConfigs
+            .FirstOrDefaultAsync(c => c.Provider == provider);
+
+        if (config == null) return null;
+
+        return new SsoConfigDto(
+            config.Provider,
+            config.ServerUrl,
+            config.BaseDn,
+            config.BindDn,
+            config.BindPassword,
+            config.UserSearchFilter,
+            config.GroupSearchFilter,
+            config.IsEnabled
+        );
+    }
+
+    public async Task<SsoConfigDto> CreateSsoConfigAsync(SsoConfigDto config)
+    {
+        var ssoConfig = new Models.SsoConfig
+        {
+            Provider = config.Provider,
+            ServerUrl = config.ServerUrl,
+            BaseDn = config.BaseDn,
+            BindDn = config.BindDn,
+            BindPassword = config.BindPassword,
+            UserSearchFilter = config.UserSearchFilter,
+            GroupSearchFilter = config.GroupSearchFilter,
+            IsEnabled = config.IsEnabled,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.SsoConfigs.Add(ssoConfig);
+        await _context.SaveChangesAsync();
+
+        return new SsoConfigDto(
+            ssoConfig.Provider,
+            ssoConfig.ServerUrl,
+            ssoConfig.BaseDn,
+            ssoConfig.BindDn,
+            ssoConfig.BindPassword,
+            ssoConfig.UserSearchFilter,
+            ssoConfig.GroupSearchFilter,
+            ssoConfig.IsEnabled
+        );
+    }
+
+    public async Task<SsoConfigDto> UpdateSsoConfigAsync(string provider, SsoConfigDto config)
+    {
+        var ssoConfig = await _context.SsoConfigs
+            .FirstOrDefaultAsync(c => c.Provider == provider);
+
+        if (ssoConfig == null) throw new ArgumentException("SSO configuration not found");
+
+        ssoConfig.ServerUrl = config.ServerUrl;
+        ssoConfig.BaseDn = config.BaseDn;
+        ssoConfig.BindDn = config.BindDn;
+        ssoConfig.BindPassword = config.BindPassword;
+        ssoConfig.UserSearchFilter = config.UserSearchFilter;
+        ssoConfig.GroupSearchFilter = config.GroupSearchFilter;
+        ssoConfig.IsEnabled = config.IsEnabled;
+        ssoConfig.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new SsoConfigDto(
+            ssoConfig.Provider,
+            ssoConfig.ServerUrl,
+            ssoConfig.BaseDn,
+            ssoConfig.BindDn,
+            ssoConfig.BindPassword,
+            ssoConfig.UserSearchFilter,
+            ssoConfig.GroupSearchFilter,
+            ssoConfig.IsEnabled
+        );
+    }
+
+    public async Task<bool> DeleteSsoConfigAsync(string provider)
+    {
+        var config = await _context.SsoConfigs
+            .FirstOrDefaultAsync(c => c.Provider == provider);
+
+        if (config == null) return false;
+
+        _context.SsoConfigs.Remove(config);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<SsoConfigDto[]> GetAllSsoConfigsAsync()
+    {
+        var configs = await _context.SsoConfigs
+            .OrderBy(c => c.Provider)
+            .Select(c => new SsoConfigDto(
+                c.Provider,
+                c.ServerUrl,
+                c.BaseDn,
+                c.BindDn,
+                c.BindPassword,
+                c.UserSearchFilter,
+                c.GroupSearchFilter,
+                c.IsEnabled
+            ))
+            .ToArrayAsync();
+
+        return configs;
+    }
+
+    public async Task<SsoUser?> AuthenticateUserAsync(SsoLoginRequest request)
+    {
+        var config = await GetSsoConfigAsync(request.Provider);
+        if (config == null || !config.IsEnabled)
+            return null;
+
+        try
+        {
+            // Simple LDAP authentication simulation
+            // In a real implementation, you would use a proper LDAP library
+            // For now, we'll simulate authentication
+            if (request.Username == "admin" && request.Password == "password")
+            {
+                return new SsoUser(
+                    request.Username,
+                    $"{request.Username}@company.com",
+                    $"{request.Username} User",
+                    new[] { "Users", "Admins" },
+                    request.Provider
+                );
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SSO authentication error: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<User?> CreateOrUpdateSsoUserAsync(SsoUser ssoUser)
+    {
+        var existingUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.SsoUsername == ssoUser.Username && u.SsoProvider == ssoUser.Provider);
+
+        if (existingUser != null)
+        {
+            // Update existing SSO user
+            existingUser.Email = ssoUser.Email;
+            existingUser.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return existingUser;
+        }
+
+        // Create new SSO user
+        var newUser = new User
+        {
+            Username = ssoUser.Username,
+            PasswordHash = "", // No password for SSO users
+            Email = ssoUser.Email,
+            Role = "User",
+            IsSsoUser = true,
+            SsoProvider = ssoUser.Provider,
+            SsoUsername = ssoUser.Username,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(newUser);
+        await _context.SaveChangesAsync();
+        return newUser;
+    }
+
+    public async Task<bool> IsSsoEnabledAsync(string provider)
+    {
+        var config = await GetSsoConfigAsync(provider);
+        return config?.IsEnabled ?? false;
+    }
+
+    public async Task<SsoUserMapping[]> GetSsoUserMappingsAsync()
+    {
+        var mappings = await _context.Users
+            .Where(u => u.IsSsoUser)
+            .Select(u => new SsoUserMapping(
+                u.Id,
+                u.SsoUsername!,
+                u.SsoProvider!,
+                u.CreatedAt
+            ))
+            .ToArrayAsync();
+
+        return mappings;
     }
 }
