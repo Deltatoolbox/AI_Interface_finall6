@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../api'
-import { Plus, Edit2, Trash2, User, Mail, Shield, ArrowLeft, Key, Users, Settings } from 'lucide-react'
+import { Plus, Edit2, Trash2, User, Mail, Shield, ArrowLeft, Key, Settings } from 'lucide-react'
 
 interface User {
   id: string
@@ -35,7 +35,7 @@ export default function UserManagementPage() {
   const [showCreateRole, setShowCreateRole] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   
-  const { user } = useAuth()
+  const { } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -144,15 +144,16 @@ export default function UserManagementPage() {
     }
   }
 
-  const handleAssignRole = async (userId: string, roleId: string) => {
-    try {
-      await api.assignRoleToUser(userId, roleId)
-      await loadUsers()
-    } catch (error) {
-      setError('Failed to assign role')
-      console.error('Error assigning role:', error)
-    }
-  }
+  // Role assignment function - kept for future use
+  // const handleAssignRole = async (userId: string, roleId: string) => {
+  //   try {
+  //     await api.assignRoleToUser(userId, roleId)
+  //     await loadUsers()
+  //   } catch (error) {
+  //     setError('Failed to assign role')
+  //     console.error('Error assigning role:', error)
+  //   }
+  // }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
