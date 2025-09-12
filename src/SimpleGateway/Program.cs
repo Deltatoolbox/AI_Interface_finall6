@@ -106,9 +106,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// CORS aktivieren
-app.UseCors("AllowFrontend");
-
 app.MapGet("/", () => "LM Gateway API is running!");
 
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
