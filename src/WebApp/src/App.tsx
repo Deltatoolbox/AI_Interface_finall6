@@ -13,6 +13,9 @@ import SearchPage from './pages/SearchPage'
 import SharedConversationPage from './pages/SharedConversationPage'
 import BackupManagementPage from './pages/BackupManagementPage'
 import AuditLogPage from './pages/AuditLogPage'
+import WebhookManagementPage from './pages/WebhookManagementPage'
+import IntegrationManagementPage from './pages/IntegrationManagementPage'
+import ModelManagementPage from './pages/ModelManagementPage'
 
 function App() {
   return (
@@ -56,6 +59,30 @@ function App() {
           element={
             <ProtectedRoute>
               <BackupManagementPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/webhooks" 
+          element={
+            <ProtectedRoute requireAdmin>
+              <WebhookManagementPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/integrations" 
+          element={
+            <ProtectedRoute requireAdmin>
+              <IntegrationManagementPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/models" 
+          element={
+            <ProtectedRoute requireAdmin>
+              <ModelManagementPage />
             </ProtectedRoute>
           } 
         />

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SimpleGateway.Data;
 
@@ -10,9 +11,11 @@ using SimpleGateway.Data;
 namespace SimpleGateway.Migrations
 {
     [DbContext(typeof(GatewayDbContext))]
-    partial class GatewayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250912121136_AddWebhookSupport")]
+    partial class AddWebhookSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.0");
@@ -282,13 +285,17 @@ namespace SimpleGateway.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("DeactivatedAt")
+                    b.Property<string>("EncryptedPrivateKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Key")
+                    b.Property<string>("PublicKey")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -296,16 +303,9 @@ namespace SimpleGateway.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Version")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("IsActive");
-
                     b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "IsActive");
 
                     b.ToTable("EncryptionKeys");
                 });
@@ -480,14 +480,8 @@ namespace SimpleGateway.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("EncryptionDisabledAt")
-                        .HasColumnType("TEXT");
-
                     b.Property<bool>("EncryptionEnabled")
                         .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("EncryptionEnabledAt")
-                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("TEXT");
@@ -508,9 +502,6 @@ namespace SimpleGateway.Migrations
                         .HasDefaultValue(90);
 
                     b.Property<DateTime?>("LastConsentUpdate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("LastKeyRotation")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Location")
@@ -853,7 +844,7 @@ namespace SimpleGateway.Migrations
             modelBuilder.Entity("SimpleGateway.Models.EncryptionKey", b =>
                 {
                     b.HasOne("SimpleGateway.Models.User", "User")
-                        .WithMany("EncryptionKeys")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -950,8 +941,6 @@ namespace SimpleGateway.Migrations
                     b.Navigation("Conversations");
 
                     b.Navigation("CreatedTemplates");
-
-                    b.Navigation("EncryptionKeys");
 
                     b.Navigation("Shares");
                 });

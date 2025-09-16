@@ -1,4 +1,4 @@
-import { Clock, Edit2, Check, X, Share2 } from 'lucide-react'
+import { Clock, Edit2, Check, X, Share2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { ShareModal } from './ShareModal'
 
@@ -16,13 +16,15 @@ interface ConversationListProps {
   currentConversation: Conversation | null
   onConversationSelect: (conversation: Conversation) => void
   onConversationRename: (conversationId: string, newTitle: string) => Promise<void>
+  onConversationDelete: (conversationId: string) => Promise<void>
 }
 
 export function ConversationList({ 
   conversations, 
   currentConversation, 
   onConversationSelect,
-  onConversationRename
+  onConversationRename,
+  onConversationDelete
 }: ConversationListProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -70,6 +72,17 @@ export function ConversationList({
   const handleShareCreated = (share: any) => {
     console.log('Share created:', share)
     // Could show a toast notification here
+  }
+
+  const handleDelete = async (conversation: Conversation) => {
+    if (window.confirm(`Are you sure you want to delete "${conversation.title}"? This action cannot be undone.`)) {
+      try {
+        await onConversationDelete(conversation.id)
+      } catch (error) {
+        console.error('Failed to delete conversation:', error)
+        alert('Failed to delete conversation. Please try again.')
+      }
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -169,6 +182,16 @@ export function ConversationList({
                         title="Rename"
                       >
                         <Edit2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDelete(conversation)
+                        }}
+                        className="p-1 hover:bg-red-200 dark:hover:bg-red-600 rounded transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
                       </button>
                     </>
                   )}

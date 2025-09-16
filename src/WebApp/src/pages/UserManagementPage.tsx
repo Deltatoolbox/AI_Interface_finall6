@@ -46,10 +46,13 @@ export default function UserManagementPage() {
   const loadUsers = async () => {
     try {
       setIsLoading(true)
+      setError('')
       const usersData = await api.getUsers()
+      console.log('Loaded users:', usersData)
       setUsers(usersData)
     } catch (error) {
-      setError('Failed to load users')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load users'
+      setError(errorMessage)
       console.error('Error loading users:', error)
     } finally {
       setIsLoading(false)
@@ -257,7 +260,7 @@ export default function UserManagementPage() {
                               ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300'
                               : 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300'
                           }`}>
-                            {userItem.roleName || userItem.role}
+                            {userItem.roleName || userItem.role || 'User'}
                           </span>
                         </div>
                       </td>
@@ -423,6 +426,7 @@ function CreateUserModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
     email: '',
     role: 'User'
   })
+  const [availableRoles] = useState<string[]>(['User', 'Moderator', 'Admin', 'SuperAdmin'])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -477,10 +481,9 @@ function CreateUserModal({ onClose, onSubmit }: { onClose: () => void; onSubmit:
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               >
-                <option value="User">User</option>
-                <option value="Moderator">Moderator</option>
-                <option value="Admin">Admin</option>
-                <option value="SuperAdmin">SuperAdmin</option>
+                {availableRoles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
               </select>
             </div>
             <div className="flex justify-end space-x-3">
@@ -512,6 +515,7 @@ function EditUserModal({ user, onClose, onSubmit }: { user: User; onClose: () =>
     email: user.email,
     role: user.role
   })
+  const [availableRoles] = useState<string[]>(['User', 'Moderator', 'Admin', 'SuperAdmin'])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -555,10 +559,9 @@ function EditUserModal({ user, onClose, onSubmit }: { user: User; onClose: () =>
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               >
-                <option value="User">User</option>
-                <option value="Moderator">Moderator</option>
-                <option value="Admin">Admin</option>
-                <option value="SuperAdmin">SuperAdmin</option>
+                {availableRoles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
               </select>
             </div>
             <div className="flex justify-end space-x-3">

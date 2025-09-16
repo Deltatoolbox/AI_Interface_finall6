@@ -5,7 +5,6 @@ import { LogOut, Settings, MessageSquare, Plus, Search, Sparkles } from 'lucide-
 import { ConversationList } from '../components/ConversationList'
 import { MessageList } from '../components/MessageList'
 import { MessageInput } from '../components/MessageInput'
-import { ModelSelector } from '../components/ModelSelector'
 import { TemplateSelector } from '../components/TemplateSelector'
 import { api } from '../api'
 
@@ -35,12 +34,6 @@ interface Conversation {
   category: string
 }
 
-interface Model {
-  id: string
-  object: string
-  created: number
-  ownedBy: string
-}
 
 export default function ChatPage() {
   const { logout } = useAuth()
@@ -48,15 +41,12 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
-  const [models, setModels] = useState<Model[]>([])
-  const [selectedModel, setSelectedModel] = useState<string>('')
   // const [isLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    loadModels()
     loadConversations()
   }, [])
 
@@ -66,29 +56,6 @@ export default function ChatPage() {
     }
   }, [currentConversation])
 
-  const loadModels = async () => {
-    try {
-      const response = await fetch('http://localhost:5058/api/models', {
-        credentials: 'include'
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setModels((data.data || []).map((model: any) => ({
-          id: model.id,
-          object: model.object,
-          created: model.created || 0,
-          ownedBy: model.owned_by
-        })).filter((model: any) => !model.id.includes('embedding'))) // Filtere Embedding-Modelle heraus
-        
-        const chatModels = (data.data || []).filter((model: any) => !model.id.includes('embedding'))
-        if (chatModels.length > 0) {
-          setSelectedModel(chatModels[0].id)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load models:', error)
-    }
-  }
 
   const loadConversations = async () => {
     try {
@@ -136,7 +103,7 @@ export default function ChatPage() {
         credentials: 'include',
         body: JSON.stringify({ 
           title, 
-          model: model || selectedModel,
+          model: model || '',
           category: category || 'General'
         }),
       })
@@ -167,7 +134,7 @@ export default function ChatPage() {
   }
 
   const sendMessage = async (content: string, files?: UploadedFile[]) => {
-    if (!selectedModel || (!content.trim() && !files?.length)) return
+    if (!content.trim() && !files?.length) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -202,7 +169,7 @@ export default function ChatPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          model: selectedModel,
+          model: currentConversation?.model || '',
           messages: [...messages, userMessage].map(m => ({
             role: m.role,
             content: m.files ? `${m.content}\n\n${m.files.map(f => f.type.startsWith('image/') ? `[Image: ${f.name}]` : `[File: ${f.name}]`).join('\n')}` : m.content
@@ -278,10 +245,28 @@ export default function ChatPage() {
     }
   }
 
+  const handleConversationDelete = async (conversationId: string) => {
+    try {
+      await api.deleteConversation(conversationId)
+      
+      // Update local state
+      setConversations(prev => prev.filter(conv => conv.id !== conversationId))
+      
+      // Clear current conversation if it's the one being deleted
+      if (currentConversation?.id === conversationId) {
+        setCurrentConversation(null)
+        setMessages([])
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error)
+      throw error
+    }
+  }
+
   const handleSelectTemplate = async (template: any) => {
     try {
       // Create a new conversation with the template
-      const conversation = await createConversation(template.name, selectedModel, template.category)
+      const conversation = await createConversation(template.name, '', template.category)
       
       // Add the system prompt as the first message
       const systemMessage: Message = {
@@ -324,12 +309,6 @@ export default function ChatPage() {
           </div>
           
           <div className="flex items-center space-x-4">
-            <ModelSelector 
-              models={models}
-              selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
-            />
-            
             <button
               onClick={() => setShowTemplateSelector(true)}
               className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
@@ -383,6 +362,7 @@ export default function ChatPage() {
             currentConversation={currentConversation}
             onConversationSelect={setCurrentConversation}
             onConversationRename={handleConversationRename}
+            onConversationDelete={handleConversationDelete}
           />
         </div>
 

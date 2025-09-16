@@ -189,6 +189,15 @@ export const api = {
     return response.json()
   },
 
+  async deleteConversation(conversationId: string) {
+    const response = await fetch(`${API_BASE_URL}/api/conversations/${conversationId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!response.ok) throw new Error('Failed to delete conversation')
+    return response.json()
+  },
+
   // Export/Import APIs
   async exportConversations() {
     const response = await fetch(`${API_BASE_URL}/api/conversations/export`, {
@@ -342,7 +351,7 @@ export const api = {
 
   // Backup/Restore API
   async getBackups() {
-    const response = await fetch(`${API_BASE_URL}/api/backups`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/backups`, {
       method: 'GET',
       credentials: 'include',
     })
@@ -351,7 +360,7 @@ export const api = {
   },
 
   async createBackup(name: string, description?: string) {
-    const response = await fetch(`${API_BASE_URL}/api/backups`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/backups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -362,7 +371,7 @@ export const api = {
   },
 
   async restoreBackup(backupId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/backups/${backupId}/restore`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/backups/${backupId}/restore`, {
       method: 'POST',
       credentials: 'include',
     })
@@ -371,7 +380,7 @@ export const api = {
   },
 
   async deleteBackup(backupId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/backups/${backupId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/backups/${backupId}`, {
       method: 'DELETE',
       credentials: 'include',
     })
@@ -379,8 +388,145 @@ export const api = {
     return response.json()
   },
 
+  // Webhook Management API
+  async getWebhooks() {
+    const response = await fetch(`${API_BASE_URL}/api/webhooks`, {
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to fetch webhooks')
+    return response.json()
+  },
+
+  async createWebhook(webhookData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/webhooks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(webhookData)
+    })
+    if (!response.ok) throw new Error('Failed to create webhook')
+    return response.json()
+  },
+
+  async updateWebhook(id: string, webhookData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/webhooks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(webhookData)
+    })
+    if (!response.ok) throw new Error('Failed to update webhook')
+    return response.json()
+  },
+
+  async deleteWebhook(id: string) {
+    const response = await fetch(`${API_BASE_URL}/api/webhooks/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to delete webhook')
+    return response.json()
+  },
+
+  async testWebhook(testData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/webhooks/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(testData)
+    })
+    if (!response.ok) throw new Error('Failed to test webhook')
+    return response.json()
+  },
+
+  async getWebhookDeliveries(id: string) {
+    const response = await fetch(`${API_BASE_URL}/api/webhooks/${id}/deliveries`, {
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to fetch webhook deliveries')
+    return response.json()
+  },
+
+  // Integration Management API
+  async getSlackChannels() {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/channels`, {
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to fetch Slack channels')
+    return response.json()
+  },
+
+  async sendSlackMessage(messageData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(messageData)
+    })
+    if (!response.ok) throw new Error('Failed to send Slack message')
+    return response.json()
+  },
+
+  async getDiscordChannels() {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/discord/channels`, {
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to fetch Discord channels')
+    return response.json()
+  },
+
+  async sendDiscordMessage(messageData: any) {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/discord/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(messageData)
+    })
+    if (!response.ok) throw new Error('Failed to send Discord message')
+    return response.json()
+  },
+
+  // Integration Configuration APIs
+  async configureSlack(botToken: string, webhookUrl?: string, channels?: string[]) {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ botToken, webhookUrl, channels })
+    })
+    if (!response.ok) throw new Error('Failed to configure Slack')
+    return response.json()
+  },
+
+  async configureDiscord(botToken: string, webhookUrl?: string, channelIds?: string[]) {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/discord/configure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ botToken, webhookUrl, channelIds })
+    })
+    if (!response.ok) throw new Error('Failed to configure Discord')
+    return response.json()
+  },
+
+  async getSlackStatus() {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/slack/status`, {
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to get Slack status')
+    return response.json()
+  },
+
+  async getDiscordStatus() {
+    const response = await fetch(`${API_BASE_URL}/api/integrations/discord/status`, {
+      credentials: 'include'
+    })
+    if (!response.ok) throw new Error('Failed to get Discord status')
+    return response.json()
+  },
+
   async downloadBackup(backupId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/backups/${backupId}/download`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/backups/${backupId}/download`, {
       method: 'GET',
       credentials: 'include',
     })
@@ -394,7 +540,7 @@ export const api = {
     formData.append('name', name)
     if (description) formData.append('description', description)
 
-    const response = await fetch(`${API_BASE_URL}/api/backups/upload`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/backups/upload`, {
       method: 'POST',
       credentials: 'include',
       body: formData,

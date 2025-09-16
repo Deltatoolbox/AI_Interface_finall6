@@ -22,6 +22,8 @@ public class GatewayDbContext : DbContext
     public DbSet<DataExport> DataExports { get; set; }
     public DbSet<DataDeletionRequest> DataDeletionRequests { get; set; }
     public DbSet<ConsentRecord> ConsentRecords { get; set; }
+    public DbSet<Webhook> Webhooks { get; set; }
+    public DbSet<WebhookDelivery> WebhookDeliveries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -186,10 +188,10 @@ public class GatewayDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.UserId);
             entity.Property(e => e.UserId).IsRequired();
-            entity.Property(e => e.PublicKey).IsRequired();
-            entity.Property(e => e.EncryptedPrivateKey).IsRequired();
+            entity.Property(e => e.Key).IsRequired();
+            entity.Property(e => e.Version).IsRequired();
+            entity.Property(e => e.IsActive).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.ExpiresAt).IsRequired();
             
             entity.HasOne(e => e.User)
                   .WithMany()
@@ -245,6 +247,62 @@ public class GatewayDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Webhook configurations
+        modelBuilder.Entity<Webhook>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Url).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.Secret).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Events).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.CreatedBy).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired();
+            
+            entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => e.IsActive);
+        });
+
+        modelBuilder.Entity<WebhookDelivery>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.WebhookId).IsRequired();
+            entity.Property(e => e.EventType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Payload).IsRequired();
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            
+            entity.HasOne(e => e.Webhook)
+                  .WithMany(w => w.Deliveries)
+                  .HasForeignKey(e => e.WebhookId)
+                  .OnDelete(DeleteBehavior.Cascade);
+                  
+            entity.HasIndex(e => e.WebhookId);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.CreatedAt);
+        });
+
+        // EncryptionKey configuration
+        modelBuilder.Entity<EncryptionKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.Key).IsRequired();
+            entity.Property(e => e.Version).IsRequired();
+            entity.Property(e => e.IsActive).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.EncryptionKeys)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+                  
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => new { e.UserId, e.IsActive });
         });
     }
 }

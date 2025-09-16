@@ -31,6 +31,7 @@ public interface IConversationService
     Task<MessageResponse[]> GetMessagesByConversationIdAsync(string conversationId);
     Task<ConversationResponse?> UpdateConversationTitleAsync(string conversationId, string userId, string newTitle);
     Task<bool> DeleteAllConversationsForUserAsync(string userId);
+    Task<bool> DeleteConversationAsync(string conversationId, string userId);
     Task AddMessageAsync(Message message);
     Task<SearchResult[]> SearchMessagesAsync(string userId, string query, int? limit = null, int? offset = null);
 }
@@ -139,20 +140,6 @@ public interface IUserProfileService
     Task<UserPreferencesDto> CreateDefaultPreferencesAsync(string userId);
     Task<UserProfile[]> GetAllUserProfilesAsync();
     Task<bool> DeleteUserProfileAsync(string userId);
-}
-
-public interface IEncryptionService
-{
-    Task<EncryptionKeyDto> CreateEncryptionKeyAsync(string userId, CreateEncryptionKeyRequest request);
-    Task<EncryptionKeyDto?> GetActiveEncryptionKeyAsync(string userId);
-    Task<EncryptionKeyDto[]> GetUserEncryptionKeysAsync(string userId);
-    Task<bool> DeactivateEncryptionKeyAsync(string keyId);
-    Task<bool> DeleteExpiredKeysAsync();
-    Task<EncryptionStatus> GetEncryptionStatusAsync(string userId);
-    Task<bool> UpdateEncryptionSettingsAsync(string userId, UpdateEncryptionSettingsRequest request);
-    Task<string> EncryptMessageAsync(string content, string userId);
-    Task<string> DecryptMessageAsync(DecryptMessageRequest request, string userId);
-    Task<bool> IsEncryptionEnabledAsync(string userId);
 }
 
 public interface IGdprService
@@ -362,10 +349,12 @@ public class UserService : IUserService
 public class ConversationService : IConversationService
 {
     private readonly GatewayDbContext _context;
+    private readonly IEncryptionService _encryptionService;
 
-    public ConversationService(GatewayDbContext context)
+    public ConversationService(GatewayDbContext context, IEncryptionService encryptionService)
     {
         _context = context;
+        _encryptionService = encryptionService;
     }
 
     public async Task<ConversationResponse[]> GetConversationsByUserIdAsync(string userId)
@@ -406,8 +395,36 @@ public class ConversationService : IConversationService
         if (conversation == null)
             return null;
 
-        var messages = conversation.Messages.Select(m => 
-            new MessageResponse(m.Id, m.Role, m.Content, m.CreatedAt)).ToArray();
+        // Decrypt messages before returning
+        var decryptedMessages = new List<MessageResponse>();
+        foreach (var message in conversation.Messages)
+        {
+            try
+            {
+                // Check if message is encrypted (contains encryption metadata)
+                string decryptedContent;
+                if (message.Content.Contains("|") && message.Content.Split('|').Length == 4)
+                {
+                    // Message is encrypted, decrypt it
+                    var parts = message.Content.Split('|');
+                    var keyId = parts[3];
+                    decryptedContent = await _encryptionService.DecryptMessageAsync(message.Content, keyId, userId);
+                }
+                else
+                {
+                    // Message is not encrypted, return as-is
+                    decryptedContent = message.Content;
+                }
+                
+                decryptedMessages.Add(new MessageResponse(message.Id, message.Role, decryptedContent, message.CreatedAt));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to decrypt message {message.Id}: {ex.Message}");
+                // If decryption fails, return encrypted content with warning
+                decryptedMessages.Add(new MessageResponse(message.Id, message.Role, $"[ENCRYPTED - Decryption failed: {message.Content.Substring(0, Math.Min(50, message.Content.Length))}...]", message.CreatedAt));
+            }
+        }
 
         return new ConversationWithMessagesResponse(
             conversation.Id, 
@@ -416,7 +433,7 @@ public class ConversationService : IConversationService
             conversation.UpdatedAt, 
             conversation.Model,
             conversation.Category,
-            messages);
+            decryptedMessages.ToArray());
     }
 
     public async Task<ConversationResponse?> UpdateConversationTitleAsync(string conversationId, string userId, string newTitle)
@@ -433,6 +450,25 @@ public class ConversationService : IConversationService
         await _context.SaveChangesAsync();
 
         return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt, conversation.Model, conversation.Category);
+    }
+
+    public async Task<bool> DeleteConversationAsync(string conversationId, string userId)
+    {
+        var conversation = await _context.Conversations
+            .Include(c => c.Messages)
+            .FirstOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId);
+
+        if (conversation == null)
+            return false;
+
+        // Delete all messages first (due to foreign key constraints)
+        _context.Messages.RemoveRange(conversation.Messages);
+
+        // Then delete the conversation
+        _context.Conversations.Remove(conversation);
+        
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<bool> DeleteAllConversationsForUserAsync(string userId)
@@ -475,10 +511,46 @@ public class ConversationService : IConversationService
         var messages = await _context.Messages
             .Where(m => m.ConversationId == conversationId)
             .OrderBy(m => m.CreatedAt)
-            .Select(m => new MessageResponse(m.Id, m.Role, m.Content, m.CreatedAt))
-            .ToArrayAsync();
+            .ToListAsync();
 
-        return messages;
+        // Decrypt messages before returning
+        var decryptedMessages = new List<MessageResponse>();
+        foreach (var message in messages)
+        {
+            try
+            {
+                // Get user ID from conversation
+                var conversation = await _context.Conversations
+                    .FirstOrDefaultAsync(c => c.Id == conversationId);
+                
+                if (conversation == null) continue;
+
+                // Check if message is encrypted (contains encryption metadata)
+                string decryptedContent;
+                if (message.Content.Contains("|") && message.Content.Split('|').Length == 4)
+                {
+                    // Message is encrypted, decrypt it
+                    var parts = message.Content.Split('|');
+                    var keyId = parts[3];
+                    decryptedContent = await _encryptionService.DecryptMessageAsync(message.Content, keyId, conversation.UserId);
+                }
+                else
+                {
+                    // Message is not encrypted, return as-is
+                    decryptedContent = message.Content;
+                }
+                
+                decryptedMessages.Add(new MessageResponse(message.Id, message.Role, decryptedContent, message.CreatedAt));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to decrypt message {message.Id}: {ex.Message}");
+                // If decryption fails, return encrypted content with warning
+                decryptedMessages.Add(new MessageResponse(message.Id, message.Role, $"[ENCRYPTED - Decryption failed: {message.Content.Substring(0, Math.Min(50, message.Content.Length))}...]", message.CreatedAt));
+            }
+        }
+
+        return decryptedMessages.ToArray();
     }
 
     public async Task AddMessageAsync(Message message)
@@ -502,21 +574,47 @@ public class ConversationService : IConversationService
             .Take(limit ?? 50)
             .ToArrayAsync();
 
-        return messages.Select(m => 
+        var searchResults = new List<SearchResult>();
+        foreach (var message in messages)
         {
-            // Simple highlighting - wrap matching text in <mark> tags
-            var highlightedContent = HighlightText(m.Content, query);
-            
-            return new SearchResult(
-                m.ConversationId,
-                m.Conversation.Title,
-                m.Id,
-                m.Role,
-                m.Content,
-                m.CreatedAt,
-                highlightedContent
-            );
-        }).ToArray();
+            try
+            {
+                // Decrypt message content for search
+                string decryptedContent;
+                if (message.Content.Contains("|") && message.Content.Split('|').Length == 4)
+                {
+                    // Message is encrypted, decrypt it
+                    var parts = message.Content.Split('|');
+                    var keyId = parts[3];
+                    decryptedContent = await _encryptionService.DecryptMessageAsync(message.Content, keyId, userId);
+                }
+                else
+                {
+                    // Message is not encrypted, return as-is
+                    decryptedContent = message.Content;
+                }
+
+                // Simple highlighting - wrap matching text in <mark> tags
+                var highlightedContent = HighlightText(decryptedContent, query);
+                
+                searchResults.Add(new SearchResult(
+                    message.ConversationId,
+                    message.Conversation.Title,
+                    message.Id,
+                    message.Role,
+                    decryptedContent,
+                    message.CreatedAt,
+                    highlightedContent
+                ));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to decrypt message {message.Id} for search: {ex.Message}");
+                // If decryption fails, skip this message from search results
+            }
+        }
+
+        return searchResults.ToArray();
     }
 
     private static string[] HighlightText(string content, string query)
@@ -850,17 +948,27 @@ public class BackupService : IBackupService
 
     public async Task<BackupInfo[]> GetBackupsAsync()
     {
+        if (!Directory.Exists(_backupDirectory))
+        {
+            return Array.Empty<BackupInfo>();
+        }
+
         var backupFiles = Directory.GetFiles(_backupDirectory, "*.db")
+            .Where(filePath => IsValidBackupFile(filePath))
             .Select(filePath =>
             {
                 var fileInfo = new FileInfo(filePath);
                 var fileName = Path.GetFileNameWithoutExtension(filePath);
+                
+                // Extract name from filename (remove timestamp)
+                var name = ExtractNameFromFileName(fileName);
+                
                 return new BackupInfo(
-                    fileName,
-                    fileName,
-                    fileInfo.CreationTime,
-                    fileInfo.Length,
-                    $"Backup created on {fileInfo.CreationTime:yyyy-MM-dd HH:mm}"
+                    fileName,           // Id
+                    name,              // Name (cleaned)
+                    fileInfo.CreationTime,  // CreatedAt
+                    fileInfo.Length,    // SizeBytes
+                    $"Backup created on {fileInfo.CreationTime:yyyy-MM-dd HH:mm}"  // Description
                 );
             })
             .OrderByDescending(b => b.CreatedAt)
@@ -869,87 +977,263 @@ public class BackupService : IBackupService
         return backupFiles;
     }
 
+    private bool IsValidBackupFile(string filePath)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(filePath);
+            
+            // Check file size (min 1KB, max 1GB)
+            if (fileInfo.Length < 1024 || fileInfo.Length > 1024 * 1024 * 1024)
+                return false;
+                
+            // Check if file is not locked
+            using var stream = fileInfo.Open(FileMode.Open, FileAccess.Read, FileShare.Read);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string ExtractNameFromFileName(string fileName)
+    {
+        // Remove timestamp pattern: name_20231201_120000 -> name
+        var parts = fileName.Split('_');
+        if (parts.Length >= 3 && parts[parts.Length - 2].Length == 8 && parts[parts.Length - 1].Length == 6)
+        {
+            return string.Join("_", parts.Take(parts.Length - 2));
+        }
+        return fileName;
+    }
+
     public async Task<BackupInfo> CreateBackupAsync(string name, string? description = null)
     {
+        // Validate input
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Backup name cannot be empty", nameof(name));
+            
+        if (name.Length > 100)
+            throw new ArgumentException("Backup name too long (max 100 characters)", nameof(name));
+
+        // Sanitize name to prevent path traversal
+        var sanitizedName = SanitizeFileName(name);
+        
         var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-        var backupFileName = $"{name}_{timestamp}.db";
+        var backupFileName = $"{sanitizedName}_{timestamp}.db";
         var backupPath = Path.Combine(_backupDirectory, backupFileName);
+
+        // Ensure backup directory exists
+        if (!Directory.Exists(_backupDirectory))
+        {
+            Directory.CreateDirectory(_backupDirectory);
+        }
 
         // Copy the current database file
         var sourceDbPath = Path.Combine(Directory.GetCurrentDirectory(), "gateway.db");
-        if (File.Exists(sourceDbPath))
-        {
-            File.Copy(sourceDbPath, backupPath, true);
-        }
-        else
+        if (!File.Exists(sourceDbPath))
         {
             throw new FileNotFoundException("Source database file not found");
         }
 
+        // Create backup with retry mechanism
+        var maxRetries = 3;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                File.Copy(sourceDbPath, backupPath, true);
+                break;
+            }
+            catch (IOException) when (i < maxRetries - 1)
+            {
+                await Task.Delay(1000); // Wait 1 second before retry
+            }
+        }
+
         var fileInfo = new FileInfo(backupPath);
         return new BackupInfo(
-            Path.GetFileNameWithoutExtension(backupFileName),
-            name,
-            fileInfo.CreationTime,
-            fileInfo.Length,
-            description ?? $"Manual backup created on {fileInfo.CreationTime:yyyy-MM-dd HH:mm}"
+            Path.GetFileNameWithoutExtension(backupFileName), // Id
+            name,                                           // Name (original)
+            fileInfo.CreationTime,                          // CreatedAt
+            fileInfo.Length,                                // SizeBytes
+            description ?? $"Manual backup created on {fileInfo.CreationTime:yyyy-MM-dd HH:mm}" // Description
         );
+    }
+
+    private string SanitizeFileName(string fileName)
+    {
+        // Remove invalid characters and replace with underscores
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+        
+        // Limit length
+        if (sanitized.Length > 50)
+            sanitized = sanitized.Substring(0, 50);
+            
+        return sanitized;
     }
 
     public async Task<bool> RestoreBackupAsync(string backupId)
     {
+        // Validate backupId to prevent path traversal
+        if (string.IsNullOrWhiteSpace(backupId) || backupId.Contains("..") || backupId.Contains("/") || backupId.Contains("\\"))
+        {
+            return false;
+        }
+
         var backupPath = Path.Combine(_backupDirectory, $"{backupId}.db");
         if (!File.Exists(backupPath))
+        {
+            return false;
+        }
+
+        // Validate backup file
+        if (!IsValidBackupFile(backupPath))
         {
             return false;
         }
 
         var targetDbPath = Path.Combine(Directory.GetCurrentDirectory(), "gateway.db");
         
-        // Create a backup of current database before restoring
-        var currentBackupPath = $"{targetDbPath}.backup_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
-        if (File.Exists(targetDbPath))
+        try
         {
-            File.Copy(targetDbPath, currentBackupPath, true);
-        }
+            // Create a backup of current database before restoring
+            var currentBackupPath = $"{targetDbPath}.backup_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+            if (File.Exists(targetDbPath))
+            {
+                File.Copy(targetDbPath, currentBackupPath, true);
+            }
 
-        // Restore the backup
-        File.Copy(backupPath, targetDbPath, true);
-        
-        return true;
+            // Restore the backup with retry mechanism
+            var maxRetries = 3;
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    File.Copy(backupPath, targetDbPath, true);
+                    break;
+                }
+                catch (IOException) when (i < maxRetries - 1)
+                {
+                    await Task.Delay(1000); // Wait 1 second before retry
+                }
+            }
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error restoring backup: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task<bool> DeleteBackupAsync(string backupId)
     {
+        // Validate backupId to prevent path traversal
+        if (string.IsNullOrWhiteSpace(backupId) || backupId.Contains("..") || backupId.Contains("/") || backupId.Contains("\\"))
+        {
+            return false;
+        }
+
         var backupPath = Path.Combine(_backupDirectory, $"{backupId}.db");
         if (!File.Exists(backupPath))
         {
             return false;
         }
 
-        File.Delete(backupPath);
-        return true;
+        try
+        {
+            File.Delete(backupPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting backup: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task<byte[]> DownloadBackupAsync(string backupId)
     {
+        // Validate backupId to prevent path traversal
+        if (string.IsNullOrWhiteSpace(backupId) || backupId.Contains("..") || backupId.Contains("/") || backupId.Contains("\\"))
+        {
+            throw new FileNotFoundException("Invalid backup ID");
+        }
+
         var backupPath = Path.Combine(_backupDirectory, $"{backupId}.db");
         if (!File.Exists(backupPath))
         {
             throw new FileNotFoundException("Backup file not found");
         }
 
-        return await File.ReadAllBytesAsync(backupPath);
+        // Validate backup file
+        if (!IsValidBackupFile(backupPath))
+        {
+            throw new FileNotFoundException("Invalid backup file");
+        }
+
+        try
+        {
+            return await File.ReadAllBytesAsync(backupPath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error downloading backup: {ex.Message}");
+            throw new FileNotFoundException("Failed to read backup file");
+        }
     }
 
     public async Task<bool> UploadBackupAsync(string name, string? description, byte[] backupData)
     {
+        // Validate input
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+            
+        if (name.Length > 100)
+            return false;
+            
+        if (backupData == null || backupData.Length == 0)
+            return false;
+            
+        // Check file size (max 1GB)
+        if (backupData.Length > 1024 * 1024 * 1024)
+            return false;
+
+        // Sanitize name to prevent path traversal
+        var sanitizedName = SanitizeFileName(name);
+        
         var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-        var backupFileName = $"{name}_{timestamp}.db";
+        var backupFileName = $"{sanitizedName}_{timestamp}.db";
         var backupPath = Path.Combine(_backupDirectory, backupFileName);
 
-        await File.WriteAllBytesAsync(backupPath, backupData);
-        return true;
+        // Ensure backup directory exists
+        if (!Directory.Exists(_backupDirectory))
+        {
+            Directory.CreateDirectory(_backupDirectory);
+        }
+
+        try
+        {
+            await File.WriteAllBytesAsync(backupPath, backupData);
+            
+            // Validate the uploaded file
+            if (!IsValidBackupFile(backupPath))
+            {
+                File.Delete(backupPath);
+                return false;
+            }
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading backup: {ex.Message}");
+            return false;
+        }
     }
 
     public async Task ScheduleAutomaticBackupsAsync()
@@ -1699,6 +1983,7 @@ public class UserRoleService : IUserRoleService
             new("admin.backups", "Manage backups", "System Administration"),
             new("admin.health", "View system health", "System Administration"),
             new("admin.audit", "View audit logs", "System Administration"),
+            new("admin.models.manage", "Manage default models", "System Administration"),
             
             // Content Management
             new("conversations.view", "View conversations", "Content Management"),
@@ -1728,10 +2013,51 @@ public class UserRoleService : IUserRoleService
             .Include(u => u.UserRole)
             .FirstOrDefaultAsync(u => u.Id == userId);
 
-        if (user?.UserRole == null) return false;
+        if (user == null) return false;
 
-        var permissions = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.UserRole.Permissions) ?? Array.Empty<string>();
-        return permissions.Contains(permission);
+        // If user has a role, check role permissions
+        if (user.UserRole != null)
+        {
+            var permissions = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.UserRole.Permissions) ?? Array.Empty<string>();
+            return permissions.Contains(permission);
+        }
+
+        // Fallback to role-based permissions for backward compatibility
+        return user.Role switch
+        {
+            "SuperAdmin" => true, // SuperAdmin has all permissions
+            "Admin" => permission switch
+            {
+                "users.view" or "users.create" or "users.edit" or "users.delete" => true,
+                "roles.view" or "roles.create" or "roles.edit" or "roles.delete" or "roles.assign" => true,
+                "admin.audit" => true,
+                "admin.dashboard" => true,
+                "admin.health" => true,
+                "admin.backups" => true,
+                "admin.settings" => true,
+                "admin.models.manage" => true,
+                "webhooks.view" or "webhooks.create" or "webhooks.edit" or "webhooks.delete" or "webhooks.test" => true,
+                "plugins.view" or "plugins.manage" => true,
+                "integrations.view" or "integrations.send" => true,
+                "conversations.view" or "conversations.create" or "conversations.edit" or "conversations.delete" or "conversations.share" or "conversations.export" => true,
+                "users.export" => true,
+                "templates.view" or "templates.create" or "templates.edit" or "templates.delete" => true,
+                "files.upload" or "files.download" or "files.delete" => true,
+                _ => false
+            },
+            "Moderator" => permission switch
+            {
+                "users.view" => true,
+                "admin.audit" => true,
+                "admin.dashboard" => true,
+                "admin.health" => true,
+                "conversations.view" or "conversations.create" or "conversations.edit" or "conversations.share" => true,
+                "templates.view" or "templates.create" or "templates.edit" => true,
+                "files.upload" or "files.download" => true,
+                _ => false
+            },
+            _ => false // Regular users have no special permissions
+        };
     }
 
     public async Task InitializeDefaultRolesAsync()
@@ -2479,190 +2805,6 @@ public class UserProfileService : IUserProfileService
 
         await _context.SaveChangesAsync();
         return true;
-    }
-}
-
-public class EncryptionService : IEncryptionService
-{
-    private readonly GatewayDbContext _context;
-
-    public EncryptionService(GatewayDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<EncryptionKeyDto> CreateEncryptionKeyAsync(string userId, CreateEncryptionKeyRequest request)
-    {
-        // Deactivate existing keys
-        var existingKeys = await _context.EncryptionKeys
-            .Where(k => k.UserId == userId && k.IsActive)
-            .ToListAsync();
-
-        foreach (var key in existingKeys)
-        {
-            key.IsActive = false;
-        }
-
-        // Create new key
-        var expiresAt = DateTime.UtcNow.AddDays(request.ExpirationDays);
-        var encryptionKey = new Models.EncryptionKey
-        {
-            UserId = userId,
-            PublicKey = request.PublicKey,
-            EncryptedPrivateKey = request.EncryptedPrivateKey,
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = expiresAt,
-            IsActive = true
-        };
-
-        _context.EncryptionKeys.Add(encryptionKey);
-        await _context.SaveChangesAsync();
-
-        return new EncryptionKeyDto(
-            encryptionKey.Id,
-            encryptionKey.UserId,
-            encryptionKey.PublicKey,
-            encryptionKey.EncryptedPrivateKey,
-            encryptionKey.CreatedAt,
-            encryptionKey.ExpiresAt,
-            encryptionKey.IsActive
-        );
-    }
-
-    public async Task<EncryptionKeyDto?> GetActiveEncryptionKeyAsync(string userId)
-    {
-        var key = await _context.EncryptionKeys
-            .FirstOrDefaultAsync(k => k.UserId == userId && k.IsActive && k.ExpiresAt > DateTime.UtcNow);
-
-        if (key == null) return null;
-
-        return new EncryptionKeyDto(
-            key.Id,
-            key.UserId,
-            key.PublicKey,
-            key.EncryptedPrivateKey,
-            key.CreatedAt,
-            key.ExpiresAt,
-            key.IsActive
-        );
-    }
-
-    public async Task<EncryptionKeyDto[]> GetUserEncryptionKeysAsync(string userId)
-    {
-        var keys = await _context.EncryptionKeys
-            .Where(k => k.UserId == userId)
-            .OrderByDescending(k => k.CreatedAt)
-            .Select(k => new EncryptionKeyDto(
-                k.Id,
-                k.UserId,
-                k.PublicKey,
-                k.EncryptedPrivateKey,
-                k.CreatedAt,
-                k.ExpiresAt,
-                k.IsActive
-            ))
-            .ToArrayAsync();
-
-        return keys;
-    }
-
-    public async Task<bool> DeactivateEncryptionKeyAsync(string keyId)
-    {
-        var key = await _context.EncryptionKeys
-            .FirstOrDefaultAsync(k => k.Id == keyId);
-
-        if (key == null) return false;
-
-        key.IsActive = false;
-        await _context.SaveChangesAsync();
-        return true;
-    }
-
-    public async Task<bool> DeleteExpiredKeysAsync()
-    {
-        var expiredKeys = await _context.EncryptionKeys
-            .Where(k => k.ExpiresAt <= DateTime.UtcNow)
-            .ToListAsync();
-
-        if (expiredKeys.Any())
-        {
-            _context.EncryptionKeys.RemoveRange(expiredKeys);
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        return false;
-    }
-
-    public async Task<EncryptionStatus> GetEncryptionStatusAsync(string userId)
-    {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-
-        if (user == null) throw new ArgumentException("User not found");
-
-        var activeKey = await GetActiveEncryptionKeyAsync(userId);
-
-        return new EncryptionStatus(
-            userId,
-            activeKey != null,
-            activeKey?.ExpiresAt,
-            user.EncryptionEnabled
-        );
-    }
-
-    public async Task<bool> UpdateEncryptionSettingsAsync(string userId, UpdateEncryptionSettingsRequest request)
-    {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-
-        if (user == null) return false;
-
-        if (request.EncryptionEnabled.HasValue)
-            user.EncryptionEnabled = request.EncryptionEnabled.Value;
-
-        if (request.KeyRotationDays.HasValue)
-            user.KeyRotationDays = request.KeyRotationDays.Value;
-
-        user.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-        return true;
-    }
-
-    public async Task<string> EncryptMessageAsync(string content, string userId)
-    {
-        // Simple encryption simulation - in production, use proper encryption libraries
-        // This is a placeholder implementation
-        var key = await GetActiveEncryptionKeyAsync(userId);
-        if (key == null) throw new InvalidOperationException("No active encryption key found");
-
-        // In a real implementation, you would use AES encryption with the user's key
-        // For now, we'll return a base64 encoded version as a placeholder
-        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-        return Convert.ToBase64String(bytes);
-    }
-
-    public async Task<string> DecryptMessageAsync(DecryptMessageRequest request, string userId)
-    {
-        // Simple decryption simulation - in production, use proper decryption libraries
-        // This is a placeholder implementation
-        var key = await _context.EncryptionKeys
-            .FirstOrDefaultAsync(k => k.Id == request.EncryptionKeyId && k.UserId == userId);
-
-        if (key == null) throw new InvalidOperationException("Encryption key not found");
-
-        // In a real implementation, you would use AES decryption with the user's key
-        // For now, we'll decode the base64 as a placeholder
-        var bytes = Convert.FromBase64String(request.EncryptedContent);
-        return System.Text.Encoding.UTF8.GetString(bytes);
-    }
-
-    public async Task<bool> IsEncryptionEnabledAsync(string userId)
-    {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-
-        return user?.EncryptionEnabled ?? false;
     }
 }
 

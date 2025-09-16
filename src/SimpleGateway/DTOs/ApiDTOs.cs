@@ -97,12 +97,15 @@ public record UserPreferencesDto(string UserId, string Theme, string Language, b
 public record UpdateUserPreferencesRequest(string? Theme, string? Language, bool? EmailNotifications, bool? PushNotifications, bool? DarkMode, string[]? NotificationSettings);
 
 // End-to-End Encryption DTOs
-public record EncryptionKeyDto(string KeyId, string UserId, string PublicKey, string EncryptedPrivateKey, DateTime CreatedAt, DateTime ExpiresAt, bool IsActive);
+public record EncryptionKeyDto(string Id, string UserId, int Version, bool IsActive, DateTime CreatedAt, DateTime? DeactivatedAt);
+public record EncryptionStatus(string UserId, bool EncryptionEnabled, bool HasActiveKey, DateTime? EncryptionEnabledAt, DateTime? LastKeyRotation, int KeyRotationDays);
+public record UpdateEncryptionSettingsRequest(bool? EncryptionEnabled, int? KeyRotationDays);
+public record EnableEncryptionRequest(string UserId);
+public record DisableEncryptionRequest(string UserId);
+public record RotateKeyRequest(string UserId);
+public record EncryptedMessageDto(string MessageId, string ConversationId, string EncryptedContent, string EncryptionKeyId, string Iv, string Tag, bool IsEncrypted, DateTime CreatedAt);
 public record CreateEncryptionKeyRequest(string PublicKey, string EncryptedPrivateKey, int ExpirationDays = 365);
-public record EncryptedMessage(string MessageId, string ConversationId, string EncryptedContent, string EncryptionKeyId, string Iv, string Tag, DateTime CreatedAt);
 public record DecryptMessageRequest(string EncryptedContent, string EncryptionKeyId, string Iv, string Tag);
-public record EncryptionStatus(string UserId, bool HasActiveKey, DateTime? KeyExpiresAt, bool EncryptionEnabled);
-public record UpdateEncryptionSettingsRequest(bool? EncryptionEnabled, int? KeyRotationDays = 90);
 
 // GDPR Compliance DTOs
 public record DataExportRequest(string UserId, string[] DataTypes, string Format = "json");
@@ -114,3 +117,24 @@ public record ConsentRequest(string UserId, string ConsentType, bool Granted, st
 public record PrivacySettings(string UserId, bool DataCollection, bool Analytics, bool Marketing, bool ThirdPartySharing, DateTime UpdatedAt);
 public record UpdatePrivacySettingsRequest(bool? DataCollection, bool? Analytics, bool? Marketing, bool? ThirdPartySharing);
 public record GdprStatus(string UserId, bool HasConsented, DateTime? LastConsentUpdate, bool DataExportAvailable, bool DataDeletionRequested);
+
+// Webhook DTOs
+public record WebhookDto(string Id, string Name, string Url, string Events, bool IsActive, int RetryCount, int TimeoutSeconds, DateTime CreatedAt, DateTime UpdatedAt, string? Description, string? CreatedBy);
+public record CreateWebhookRequest(string Name, string Url, string Secret, string[] Events, string? Description, int RetryCount = 3, int TimeoutSeconds = 30);
+public record UpdateWebhookRequest(string? Name, string? Url, string? Secret, string[]? Events, string? Description, bool? IsActive, int? RetryCount, int? TimeoutSeconds);
+public record WebhookDeliveryDto(string Id, string WebhookId, string EventType, string Status, int Attempts, int? ResponseCode, string? ResponseBody, string? ErrorMessage, DateTime CreatedAt, DateTime? DeliveredAt, DateTime? NextRetryAt);
+public record WebhookTestRequest(string Url, string Secret, string EventType, object Payload);
+public record WebhookTestResponse(bool Success, int? ResponseCode, string? ResponseBody, string? ErrorMessage, TimeSpan Duration);
+
+// Integration DTOs
+public record SlackSendRequest(string Channel, string Message, string? ThreadTs = null);
+public record DiscordSendRequest(string ChannelId, string Message);
+public record IntegrationStatus(string Platform, bool IsConfigured, bool IsEnabled, string? LastError);
+
+// Integration Configuration DTOs
+public record SlackConfigRequest(string BotToken, string? WebhookUrl, string[] Channels);
+public record DiscordConfigRequest(string BotToken, string? WebhookUrl, string[] ChannelIds);
+public record IntegrationConfigResponse(string Platform, bool IsConfigured, string[] AvailableChannels, string? LastError);
+
+// Model Management DTOs
+public record SetDefaultModelRequest(string ModelId);

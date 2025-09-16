@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Users, MessageSquare, Settings, ArrowLeft, Database, Server, TrendingUp, Activity, AlertCircle, BarChart3, Cpu, MemoryStick, HardDrive, Wifi, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import { LogOut, Users, MessageSquare, Settings, ArrowLeft, Database, Server, TrendingUp, Activity, AlertCircle, BarChart3, Cpu, MemoryStick, HardDrive, Wifi, Clock, CheckCircle, XCircle, RefreshCw, Webhook, Bot } from 'lucide-react'
 import { api } from '../api'
 
 interface AdminStats {
@@ -179,22 +179,6 @@ export default function AdminPage() {
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
-            <button
-              onClick={() => navigate('/admin/users')}
-              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-            >
-              <Users className="h-5 w-5" />
-              <span>User Management</span>
-            </button>
-            
-            <button
-              onClick={() => navigate('/audit')}
-              className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-            >
-              <Database className="h-5 w-5" />
-              <span>Audit Trail</span>
-            </button>
-            
             <button
               onClick={handleLogout}
               className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
@@ -438,6 +422,38 @@ export default function AdminPage() {
             >
               <Database className="h-5 w-5 mr-2 text-indigo-600" />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Audit Trail</span>
+            </button>
+            
+            <button
+              onClick={() => navigate('/backups')}
+              className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <HardDrive className="h-5 w-5 mr-2 text-orange-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Backup Management</span>
+            </button>
+            
+            <button
+              onClick={() => navigate('/admin/webhooks')}
+              className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Webhook className="h-5 w-5 mr-2 text-blue-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Webhook Management</span>
+            </button>
+            
+            <button
+              onClick={() => navigate('/admin/integrations')}
+              className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Bot className="h-5 w-5 mr-2 text-purple-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Integration Management</span>
+            </button>
+            
+            <button
+              onClick={() => navigate('/admin/models')}
+              className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Cpu className="h-5 w-5 mr-2 text-orange-600" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Model Management</span>
             </button>
             
             <button

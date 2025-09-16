@@ -8,12 +8,46 @@ using SimpleGateway.Services;
 using SimpleGateway.DTOs;
 using SimpleGateway.Models;
 using SimpleGateway.Configuration;
+using SimpleGateway.Plugins;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "LM Gateway API",
+        Version = "v1",
+        Description = "API für das LM Gateway System mit Chat, User Management, Webhooks und mehr"
+    });
+    
+    // JWT Authentication für Swagger
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 // Add configuration
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
@@ -59,6 +93,11 @@ builder.Services.AddScoped<ISsoService, SsoService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 builder.Services.AddScoped<IGdprService, GdprService>();
+builder.Services.AddScoped<IWebhookService, WebhookService>();
+builder.Services.AddScoped<IPluginManager, PluginManager>();
+builder.Services.AddScoped<ISlackService, SlackService>();
+builder.Services.AddScoped<IDiscordService, DiscordService>();
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<IJwtTokenService>(provider =>
 {
     var jwtSettings = provider.GetRequiredService<IOptions<JwtSettings>>().Value;
@@ -81,6 +120,17 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline
 app.UseCors("AllowFrontend");
+
+// Swagger UI für API-Dokumentation
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "LM Gateway API v1");
+        c.RoutePrefix = "api-docs"; // Swagger UI unter /api-docs verfügbar
+    });
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -145,6 +195,76 @@ app.MapGet("/api/models", async () =>
                 new { id = "gpt-3.5-turbo", @object = "model", created = 1234567890, owned_by = "openai" }
             }
         });
+    }
+});
+
+// Model Management API Endpoints (Admin only)
+app.MapGet("/api/models/status", async () =>
+{
+    try
+    {
+        using var httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
+        
+        var response = await httpClient.GetAsync("http://localhost:1234/v1/models");
+        
+        return Results.Ok(new { 
+            connected = response.IsSuccessStatusCode,
+            lastCheck = DateTime.UtcNow,
+            errorMessage = response.IsSuccessStatusCode ? null : "LM Studio not available"
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { 
+            connected = false,
+            lastCheck = DateTime.UtcNow,
+            errorMessage = ex.Message
+        });
+    }
+});
+
+app.MapPost("/api/admin/models/set-default", async (SetDefaultModelRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.models.manage"))
+        return Results.Forbid();
+    
+    try
+    {
+        // Store the default model in configuration or database
+        // For now, we'll just validate the model exists
+        using var httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
+        
+        var response = await httpClient.GetAsync("http://localhost:1234/v1/models");
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var modelsData = System.Text.Json.JsonDocument.Parse(content);
+            var models = modelsData.RootElement.GetProperty("data").EnumerateArray();
+            
+            var modelExists = models.Any(m => m.GetProperty("id").GetString() == request.ModelId);
+            
+            if (!modelExists)
+            {
+                return Results.BadRequest(new { success = false, message = "Model not found in LM Studio" });
+            }
+        }
+        
+        // TODO: Store default model in database or configuration
+        Console.WriteLine($"Default model set to: {request.ModelId}");
+        
+        return Results.Ok(new { success = true, message = "Default model updated successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error setting default model: {ex.Message}");
+        return Results.Problem("Failed to set default model");
     }
 });
 
@@ -214,7 +334,7 @@ app.MapPost("/api/auth/logout", (HttpContext context) =>
 });
 
 // User Registration API
-app.MapPost("/api/auth/register", async (RegisterRequest request, IUserService userService, IConfiguration config) =>
+app.MapPost("/api/auth/register", async (RegisterRequest request, IUserService userService, IConfiguration config, IWebhookService webhookService) =>
 {
     var userManagementSettings = config.GetSection("UserManagement").Get<UserManagementSettings>();
     
@@ -233,6 +353,14 @@ app.MapPost("/api/auth/register", async (RegisterRequest request, IUserService u
     {
         return Results.BadRequest(new RegisterResponse(false, "Failed to create user"));
     }
+
+    // Trigger webhook event
+    await webhookService.TriggerWebhookAsync("user.created", new {
+        userId = user.Id,
+        username = user.Username,
+        email = user.Email,
+        createdAt = user.CreatedAt
+    });
 
     var userResponse = new UserResponse(user.Id, user.Username, user.Email, user.Role, user.CreatedAt);
     return Results.Ok(new RegisterResponse(true, "User created successfully", userResponse));
@@ -303,7 +431,7 @@ app.MapPut("/api/conversations/{id}", async (string id, UpdateConversationReques
     return Results.Ok(conversation);
 });
 
-app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IConversationService conversationService, IJwtTokenService jwtService, IAuditService auditService) =>
+app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserService userService, IMessageService messageService, IConversationService conversationService, IJwtTokenService jwtService, IAuditService auditService, IEncryptionService encryptionService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
@@ -364,7 +492,15 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserS
             // Speichere Messages wenn ConversationId vorhanden ist
             if (!string.IsNullOrEmpty(request.ConversationId))
             {
-                await messageService.SaveMessagesAsync(request.ConversationId, request.Messages);
+                // Encrypt messages before saving
+                var encryptedMessages = new List<MessageDto>();
+                foreach (var msg in request.Messages)
+                {
+                    var encryptedContent = await encryptionService.EncryptMessageAsync(msg.Content, user.Id);
+                    encryptedMessages.Add(new MessageDto(msg.Role, encryptedContent));
+                }
+                
+                await messageService.SaveMessagesAsync(request.ConversationId, encryptedMessages.ToArray());
                 
                 // Speichere Assistant Response
                 var assistantContent = "Keine Antwort";
@@ -384,7 +520,9 @@ app.MapPost("/api/chat", async (ChatRequest request, HttpContext context, IUserS
                     Console.WriteLine($"Fehler beim Parsen der LM Studio Antwort: {ex.Message}");
                 }
                 
-                await messageService.SaveAssistantMessageAsync(request.ConversationId, assistantContent);
+                // Encrypt assistant response before saving
+                var encryptedAssistantContent = await encryptionService.EncryptMessageAsync(assistantContent, user.Id);
+                await messageService.SaveAssistantMessageAsync(request.ConversationId, encryptedAssistantContent);
                 Console.WriteLine($"Messages gespeichert für Conversation: {request.ConversationId}");
             }
             
@@ -453,11 +591,14 @@ app.MapGet("/api/admin/users", async (HttpContext context, IUserService userServ
     return Results.Ok(userResponses);
 });
 
-app.MapPost("/api/admin/users", async (CreateUserRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/users", async (CreateUserRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
-    if (user == null || user.Role != "Admin")
+    if (user == null)
         return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "users.create"))
+        return Results.Forbid();
 
     if (await userService.UserExistsAsync(request.Username))
     {
@@ -474,11 +615,14 @@ app.MapPost("/api/admin/users", async (CreateUserRequest request, HttpContext co
     return Results.Ok(userResponse);
 });
 
-app.MapPut("/api/admin/users/{id}", async (string id, UpdateUserRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+app.MapPut("/api/admin/users/{id}", async (string id, UpdateUserRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
-    if (user == null || user.Role != "Admin")
+    if (user == null)
         return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "users.edit"))
+        return Results.Forbid();
 
     var updatedUser = await userService.UpdateUserAsync(id, request.Username, request.Email, request.Role);
     if (updatedUser == null)
@@ -488,11 +632,14 @@ app.MapPut("/api/admin/users/{id}", async (string id, UpdateUserRequest request,
     return Results.Ok(userResponse);
 });
 
-app.MapDelete("/api/admin/users/{id}", async (string id, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
+app.MapDelete("/api/admin/users/{id}", async (string id, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
-    if (user == null || user.Role != "Admin")
+    if (user == null)
         return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "users.delete"))
+        return Results.Forbid();
 
     if (user.Id == id)
         return Results.BadRequest(new { message = "Cannot delete your own account" });
@@ -505,11 +652,14 @@ app.MapDelete("/api/admin/users/{id}", async (string id, HttpContext context, IU
 });
 
         // Admin stats endpoint
-        app.MapGet("/api/admin/stats", async (HttpContext context, IUserService userService, IConversationService conversationService, IJwtTokenService jwtService, GatewayDbContext dbContext) =>
+        app.MapGet("/api/admin/stats", async (HttpContext context, IUserService userService, IUserRoleService roleService, IConversationService conversationService, IJwtTokenService jwtService, GatewayDbContext dbContext) =>
         {
             var user = await GetCurrentUserAsync(context, userService, jwtService);
-            if (user == null || user.Role != "Admin")
+            if (user == null)
                 return Results.Unauthorized();
+
+            if (!await roleService.UserHasPermissionAsync(user.Id, "admin.dashboard"))
+                return Results.Forbid();
 
             try
             {
@@ -566,6 +716,19 @@ app.MapDelete("/api/conversations", async (HttpContext context, IConversationSer
 
     return Results.Ok(new { message = "All conversations deleted successfully" });
 }).AllowAnonymous();
+
+app.MapDelete("/api/conversations/{conversationId}", async (string conversationId, HttpContext context, IConversationService conversationService, IUserService userService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    var success = await conversationService.DeleteConversationAsync(conversationId, user.Id);
+    if (!success)
+        return Results.BadRequest(new { message = "Failed to delete conversation" });
+
+    return Results.Ok(new { message = "Conversation deleted successfully" });
+});
 
 app.MapPost("/api/auth/change-password", async (ChangePasswordRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService) =>
 {
@@ -807,8 +970,15 @@ app.MapGet("/api/shares", async (HttpContext context, IUserService userService, 
 });
 
 // Chat Templates Endpoints
-app.MapGet("/api/templates", async (IChatTemplateService templateService) =>
+app.MapGet("/api/templates", async (HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.view"))
+        return Results.Forbid();
+
     try
     {
         var templates = await templateService.GetAllTemplatesAsync();
@@ -821,8 +991,15 @@ app.MapGet("/api/templates", async (IChatTemplateService templateService) =>
     }
 });
 
-app.MapGet("/api/templates/categories", async (IChatTemplateService templateService) =>
+app.MapGet("/api/templates/categories", async (HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.view"))
+        return Results.Forbid();
+
     try
     {
         var categories = await templateService.GetCategoriesAsync();
@@ -835,8 +1012,15 @@ app.MapGet("/api/templates/categories", async (IChatTemplateService templateServ
     }
 });
 
-app.MapGet("/api/templates/{templateId}", async (string templateId, IChatTemplateService templateService) =>
+app.MapGet("/api/templates/{templateId}", async (string templateId, HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.view"))
+        return Results.Forbid();
+
     try
     {
         var template = await templateService.GetTemplateByIdAsync(templateId);
@@ -852,8 +1036,15 @@ app.MapGet("/api/templates/{templateId}", async (string templateId, IChatTemplat
     }
 });
 
-app.MapGet("/api/templates/category/{category}", async (string category, IChatTemplateService templateService) =>
+app.MapGet("/api/templates/category/{category}", async (string category, HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.view"))
+        return Results.Forbid();
+
     try
     {
         var templates = await templateService.GetTemplatesByCategoryAsync(category);
@@ -866,11 +1057,14 @@ app.MapGet("/api/templates/category/{category}", async (string category, IChatTe
     }
 });
 
-app.MapPost("/api/templates", async (CreateTemplateRequest request, HttpContext context, IUserService userService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
+app.MapPost("/api/templates", async (CreateTemplateRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.create"))
+        return Results.Forbid();
 
     try
     {
@@ -884,11 +1078,14 @@ app.MapPost("/api/templates", async (CreateTemplateRequest request, HttpContext 
     }
 });
 
-app.MapPut("/api/templates/{templateId}", async (string templateId, CreateTemplateRequest request, HttpContext context, IUserService userService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
+app.MapPut("/api/templates/{templateId}", async (string templateId, CreateTemplateRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.edit"))
+        return Results.Forbid();
 
     try
     {
@@ -905,11 +1102,14 @@ app.MapPut("/api/templates/{templateId}", async (string templateId, CreateTempla
     }
 });
 
-app.MapDelete("/api/templates/{templateId}", async (string templateId, HttpContext context, IUserService userService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
+app.MapDelete("/api/templates/{templateId}", async (string templateId, HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.delete"))
+        return Results.Forbid();
 
     try
     {
@@ -926,8 +1126,15 @@ app.MapDelete("/api/templates/{templateId}", async (string templateId, HttpConte
     }
 });
 
-app.MapPost("/api/templates/seed", async (IChatTemplateService templateService) =>
+app.MapPost("/api/templates/seed", async (HttpContext context, IUserService userService, IUserRoleService roleService, IChatTemplateService templateService, IJwtTokenService jwtService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "templates.create"))
+        return Results.Forbid();
+
     try
     {
         await templateService.SeedBuiltInTemplatesAsync();
@@ -941,14 +1148,13 @@ app.MapPost("/api/templates/seed", async (IChatTemplateService templateService) 
 });
 
 // Admin Backup/Restore Endpoints
-app.MapGet("/api/admin/backups", async (HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapGet("/api/admin/backups", async (HttpContext context, IUserService userService, IUserRoleService roleService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can access backups
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.backups"))
         return Results.Forbid();
 
     try
@@ -963,14 +1169,13 @@ app.MapGet("/api/admin/backups", async (HttpContext context, IUserService userSe
     }
 });
 
-app.MapPost("/api/admin/backups", async (CreateBackupRequest request, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/backups", async (CreateBackupRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can create backups
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.backups"))
         return Results.Forbid();
 
     try
@@ -985,14 +1190,13 @@ app.MapPost("/api/admin/backups", async (CreateBackupRequest request, HttpContex
     }
 });
 
-app.MapPost("/api/admin/backups/{backupId}/restore", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/backups/{backupId}/restore", async (string backupId, HttpContext context, IUserService userService, IUserRoleService roleService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can restore backups
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.backups"))
         return Results.Forbid();
 
     try
@@ -1010,14 +1214,13 @@ app.MapPost("/api/admin/backups/{backupId}/restore", async (string backupId, Htt
     }
 });
 
-app.MapDelete("/api/admin/backups/{backupId}", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapDelete("/api/admin/backups/{backupId}", async (string backupId, HttpContext context, IUserService userService, IUserRoleService roleService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can delete backups
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.backups"))
         return Results.Forbid();
 
     try
@@ -1035,14 +1238,13 @@ app.MapDelete("/api/admin/backups/{backupId}", async (string backupId, HttpConte
     }
 });
 
-app.MapGet("/api/admin/backups/{backupId}/download", async (string backupId, HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapGet("/api/admin/backups/{backupId}/download", async (string backupId, HttpContext context, IUserService userService, IUserRoleService roleService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can download backups
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.backups"))
         return Results.Forbid();
 
     try
@@ -1061,14 +1263,13 @@ app.MapGet("/api/admin/backups/{backupId}/download", async (string backupId, Htt
     }
 });
 
-app.MapPost("/api/admin/backups/upload", async (HttpContext context, IUserService userService, IBackupService backupService, IJwtTokenService jwtService) =>
+app.MapPost("/api/admin/backups/upload", async (HttpContext context, IUserService userService, IUserRoleService roleService, IBackupService backupService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can upload backups
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.backups"))
         return Results.Forbid();
 
     try
@@ -1078,8 +1279,20 @@ app.MapPost("/api/admin/backups/upload", async (HttpContext context, IUserServic
         var name = form["name"].ToString();
         var description = form["description"].ToString();
 
+        // Validate input
         if (file == null || string.IsNullOrEmpty(name))
             return Results.BadRequest("Backup file and name are required");
+
+        if (name.Length > 100)
+            return Results.BadRequest("Backup name too long (max 100 characters)");
+
+        // Check file size (max 1GB)
+        if (file.Length > 1024 * 1024 * 1024)
+            return Results.BadRequest("Backup file too large (max 1GB)");
+
+        // Check file extension
+        if (!file.FileName.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+            return Results.BadRequest("Only .db files are allowed");
 
         using var memoryStream = new MemoryStream();
         await file.CopyToAsync(memoryStream);
@@ -1099,8 +1312,15 @@ app.MapPost("/api/admin/backups/upload", async (HttpContext context, IUserServic
 });
 
 // Health Monitoring Endpoints
-app.MapGet("/api/health", async (IHealthMonitoringService healthService) =>
+app.MapGet("/api/health", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IHealthMonitoringService healthService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.health"))
+        return Results.Forbid();
+
     try
     {
         var health = await healthService.GetSystemHealthAsync();
@@ -1113,8 +1333,15 @@ app.MapGet("/api/health", async (IHealthMonitoringService healthService) =>
     }
 });
 
-app.MapGet("/api/health/metrics", async (IHealthMonitoringService healthService) =>
+app.MapGet("/api/health/metrics", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IHealthMonitoringService healthService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.health"))
+        return Results.Forbid();
+
     try
     {
         var metrics = await healthService.GetSystemMetricsAsync();
@@ -1127,8 +1354,15 @@ app.MapGet("/api/health/metrics", async (IHealthMonitoringService healthService)
     }
 });
 
-app.MapGet("/api/health/services", async (IHealthMonitoringService healthService) =>
+app.MapGet("/api/health/services", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IHealthMonitoringService healthService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.health"))
+        return Results.Forbid();
+
     try
     {
         var services = await healthService.GetServiceStatusesAsync();
@@ -1141,8 +1375,15 @@ app.MapGet("/api/health/services", async (IHealthMonitoringService healthService
     }
 });
 
-app.MapPost("/api/health/check/{serviceName}", async (string serviceName, IHealthMonitoringService healthService) =>
+app.MapPost("/api/health/check/{serviceName}", async (string serviceName, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IHealthMonitoringService healthService) =>
 {
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null)
+        return Results.Unauthorized();
+
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.health"))
+        return Results.Forbid();
+
     try
     {
         var isHealthy = await healthService.CheckServiceHealthAsync(serviceName);
@@ -1160,6 +1401,7 @@ app.MapGet("/api/audit/logs", async (
     [AsParameters] AuditLogFilter filter,
     HttpContext context, 
     IUserService userService, 
+    IUserRoleService roleService,
     IAuditService auditService, 
     IJwtTokenService jwtService) =>
 {
@@ -1167,8 +1409,7 @@ app.MapGet("/api/audit/logs", async (
     if (user == null)
         return Results.Unauthorized();
 
-    // Only admins can view audit logs
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.audit"))
         return Results.Forbid();
 
     try
@@ -1183,13 +1424,13 @@ app.MapGet("/api/audit/logs", async (
     }
 });
 
-app.MapGet("/api/audit/actions", async (HttpContext context, IUserService userService, IAuditService auditService, IJwtTokenService jwtService) =>
+app.MapGet("/api/audit/actions", async (HttpContext context, IUserService userService, IUserRoleService roleService, IAuditService auditService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.audit"))
         return Results.Forbid();
 
     try
@@ -1204,13 +1445,13 @@ app.MapGet("/api/audit/actions", async (HttpContext context, IUserService userSe
     }
 });
 
-app.MapGet("/api/audit/resources", async (HttpContext context, IUserService userService, IAuditService auditService, IJwtTokenService jwtService) =>
+app.MapGet("/api/audit/resources", async (HttpContext context, IUserService userService, IUserRoleService roleService, IAuditService auditService, IJwtTokenService jwtService) =>
 {
     var user = await GetCurrentUserAsync(context, userService, jwtService);
     if (user == null)
         return Results.Unauthorized();
 
-    if (user.Role != "Admin")
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.audit"))
         return Results.Forbid();
 
     try
@@ -1535,17 +1776,719 @@ app.MapPost("/api/guest/cleanup", async (GuestCleanupRequest request, HttpContex
     }
 });
 
+// Webhook Management Endpoints
+app.MapGet("/api/webhooks", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.view"))
+        return Results.Forbid();
+    
+    try
+    {
+        var webhooks = await webhookService.GetWebhooksAsync();
+        return Results.Ok(webhooks);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting webhooks: {ex.Message}");
+        return Results.Problem("Failed to get webhooks");
+    }
+});
+
+app.MapGet("/api/webhooks/{id}", async (string id, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.view"))
+        return Results.Forbid();
+    
+    try
+    {
+        var webhook = await webhookService.GetWebhookAsync(id);
+        if (webhook == null) return Results.NotFound();
+        return Results.Ok(webhook);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting webhook: {ex.Message}");
+        return Results.Problem("Failed to get webhook");
+    }
+});
+
+app.MapPost("/api/webhooks", async (CreateWebhookRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.create"))
+        return Results.Forbid();
+    
+    try
+    {
+        var webhook = await webhookService.CreateWebhookAsync(request, user.Username);
+        return Results.Created($"/api/webhooks/{webhook.Id}", webhook);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error creating webhook: {ex.Message}");
+        return Results.Problem("Failed to create webhook");
+    }
+});
+
+app.MapPut("/api/webhooks/{id}", async (string id, UpdateWebhookRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.edit"))
+        return Results.Forbid();
+    
+    try
+    {
+        var webhook = await webhookService.UpdateWebhookAsync(id, request);
+        return Results.Ok(webhook);
+    }
+    catch (ArgumentException)
+    {
+        return Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating webhook: {ex.Message}");
+        return Results.Problem("Failed to update webhook");
+    }
+});
+
+app.MapDelete("/api/webhooks/{id}", async (string id, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.delete"))
+        return Results.Forbid();
+    
+    try
+    {
+        await webhookService.DeleteWebhookAsync(id);
+        return Results.NoContent();
+    }
+    catch (ArgumentException)
+    {
+        return Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting webhook: {ex.Message}");
+        return Results.Problem("Failed to delete webhook");
+    }
+});
+
+app.MapPost("/api/webhooks/test", async (WebhookTestRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.test"))
+        return Results.Forbid();
+    
+    try
+    {
+        var result = await webhookService.TestWebhookAsync(request);
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error testing webhook: {ex.Message}");
+        return Results.Problem("Failed to test webhook");
+    }
+});
+
+app.MapGet("/api/webhooks/{id}/deliveries", async (string id, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IWebhookService webhookService, int page = 1, int pageSize = 50) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "webhooks.view"))
+        return Results.Forbid();
+    
+    try
+    {
+        var deliveries = await webhookService.GetWebhookDeliveriesAsync(id, page, pageSize);
+        return Results.Ok(deliveries);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting webhook deliveries: {ex.Message}");
+        return Results.Problem("Failed to get webhook deliveries");
+    }
+});
+
+// End-to-End Encryption Endpoints
+app.MapGet("/api/encryption/status", async (HttpContext context, IUserService userService, IJwtTokenService jwtService, IEncryptionService encryptionService, GatewayDbContext dbContext) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    try
+    {
+        var isEnabled = await encryptionService.IsEncryptionEnabledAsync(user.Id);
+        var hasActiveKey = await dbContext.EncryptionKeys.AnyAsync(k => k.UserId == user.Id && k.IsActive);
+        
+        return Results.Ok(new EncryptionStatus(
+            user.Id,
+            isEnabled,
+            hasActiveKey,
+            user.EncryptionEnabledAt,
+            user.LastKeyRotation,
+            user.KeyRotationDays
+        ));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting encryption status: {ex.Message}");
+        return Results.Problem("Failed to get encryption status");
+    }
+});
+
+app.MapPost("/api/encryption/enable", async (HttpContext context, IUserService userService, IJwtTokenService jwtService, IEncryptionService encryptionService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    try
+    {
+        var success = await encryptionService.EnableEncryptionAsync(user.Id);
+        if (success)
+        {
+            return Results.Ok(new { success = true, message = "Encryption enabled successfully" });
+        }
+        else
+        {
+            return Results.Problem("Failed to enable encryption");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error enabling encryption: {ex.Message}");
+        return Results.Problem("Failed to enable encryption");
+    }
+});
+
+app.MapPost("/api/encryption/disable", async (HttpContext context, IUserService userService, IJwtTokenService jwtService, IEncryptionService encryptionService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    try
+    {
+        var success = await encryptionService.DisableEncryptionAsync(user.Id);
+        if (success)
+        {
+            return Results.Ok(new { success = true, message = "Encryption disabled successfully" });
+        }
+        else
+        {
+            return Results.Problem("Failed to disable encryption");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error disabling encryption: {ex.Message}");
+        return Results.Problem("Failed to disable encryption");
+    }
+});
+
+app.MapPost("/api/encryption/rotate-key", async (HttpContext context, IUserService userService, IJwtTokenService jwtService, IEncryptionService encryptionService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    try
+    {
+        var success = await encryptionService.RotateEncryptionKeyAsync(user.Id);
+        if (success)
+        {
+            return Results.Ok(new { success = true, message = "Encryption key rotated successfully" });
+        }
+        else
+        {
+            return Results.Problem("Failed to rotate encryption key");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error rotating encryption key: {ex.Message}");
+        return Results.Problem("Failed to rotate encryption key");
+    }
+});
+
+app.MapPut("/api/encryption/settings", async (UpdateEncryptionSettingsRequest request, HttpContext context, IUserService userService, IJwtTokenService jwtService, IEncryptionService encryptionService, GatewayDbContext dbContext) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    try
+    {
+        if (request.EncryptionEnabled.HasValue)
+        {
+            if (request.EncryptionEnabled.Value)
+            {
+                await encryptionService.EnableEncryptionAsync(user.Id);
+            }
+            else
+            {
+                await encryptionService.DisableEncryptionAsync(user.Id);
+            }
+        }
+        
+        // Update key rotation settings
+        if (request.KeyRotationDays.HasValue)
+        {
+            user.KeyRotationDays = request.KeyRotationDays.Value;
+            await dbContext.SaveChangesAsync();
+        }
+        
+        return Results.Ok(new { success = true, message = "Encryption settings updated successfully" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating encryption settings: {ex.Message}");
+        return Results.Problem("Failed to update encryption settings");
+    }
+});
+
+// Extended API Endpoints for External Applications
+app.MapGet("/api/v1/status", () => Results.Ok(new { 
+    status = "online", 
+    timestamp = DateTime.UtcNow,
+    version = "1.0.0",
+    services = new { 
+        database = "online",
+        webhooks = "online",
+        authentication = "online"
+    }
+}));
+
+app.MapGet("/api/v1/info", () => Results.Ok(new {
+    name = "LM Gateway API",
+    version = "1.0.0",
+    description = "API für das LM Gateway System",
+    endpoints = new {
+        authentication = "/api/auth/*",
+        users = "/api/users/*",
+        conversations = "/api/conversations/*",
+        webhooks = "/api/webhooks/*",
+        admin = "/api/admin/*",
+        health = "/api/health/*"
+    },
+    rateLimits = new {
+        global = "100 requests/minute",
+        api = "1000 requests/minute"
+    }
+}));
+
+app.MapGet("/api/v1/metrics", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, GatewayDbContext dbContext) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "admin.dashboard"))
+        return Results.Forbid();
+    
+    try
+    {
+        // Get basic stats from existing endpoints
+        var totalUsers = await userService.GetAllUsersAsync();
+        var totalConversations = await dbContext.Conversations.CountAsync();
+        var totalMessages = await dbContext.Messages.CountAsync();
+        
+        return Results.Ok(new {
+            timestamp = DateTime.UtcNow,
+            metrics = new {
+                users = new {
+                    total = totalUsers.Count(),
+                    active = totalUsers.Count(u => u.CreatedAt > DateTime.UtcNow.AddDays(-30)),
+                    newToday = totalUsers.Count(u => u.CreatedAt.Date == DateTime.UtcNow.Date)
+                },
+                conversations = new {
+                    total = totalConversations,
+                    active = await dbContext.Conversations.CountAsync(c => c.UpdatedAt > DateTime.UtcNow.AddDays(-7)),
+                    newToday = await dbContext.Conversations.CountAsync(c => c.CreatedAt.Date == DateTime.UtcNow.Date)
+                },
+                messages = new {
+                    total = totalMessages,
+                    newToday = await dbContext.Messages.CountAsync(m => m.CreatedAt.Date == DateTime.UtcNow.Date)
+                }
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting metrics: {ex.Message}");
+        return Results.Problem("Failed to get metrics");
+    }
+});
+
+app.MapGet("/api/v1/export/users", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "users.export"))
+        return Results.Forbid();
+    
+    try
+    {
+        var users = await userService.GetAllUsersAsync();
+        var exportData = users.Select(u => new {
+            id = u.Id,
+            username = u.Username,
+            email = u.Email,
+            role = u.Role,
+            createdAt = u.CreatedAt,
+            lastLogin = u.UpdatedAt,
+            isActive = true
+        });
+        
+        return Results.Ok(new {
+            timestamp = DateTime.UtcNow,
+            format = "json",
+            count = exportData.Count(),
+            data = exportData
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error exporting users: {ex.Message}");
+        return Results.Problem("Failed to export users");
+    }
+});
+
+app.MapGet("/api/v1/export/conversations", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, GatewayDbContext dbContext) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "conversations.export"))
+        return Results.Forbid();
+    
+    try
+    {
+        var conversations = await dbContext.Conversations
+            .Include(c => c.Messages)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+            
+        var exportData = conversations.Select(c => new {
+            id = c.Id,
+            title = c.Title,
+            userId = c.UserId,
+            model = c.Model,
+            category = c.Category,
+            createdAt = c.CreatedAt,
+            updatedAt = c.UpdatedAt,
+            messageCount = c.Messages.Count,
+            messages = c.Messages.Select(m => new {
+                id = m.Id,
+                role = m.Role,
+                content = m.Content,
+                timestamp = m.CreatedAt
+            })
+        });
+        
+        return Results.Ok(new {
+            timestamp = DateTime.UtcNow,
+            format = "json",
+            count = exportData.Count(),
+            data = exportData
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error exporting conversations: {ex.Message}");
+        return Results.Problem("Failed to export conversations");
+    }
+});
+
+// Plugin Management Endpoints
+app.MapGet("/api/plugins", async (HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IPluginManager pluginManager) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "plugins.view"))
+        return Results.Forbid();
+    
+    try
+    {
+        var plugins = await pluginManager.GetLoadedPluginsAsync();
+        var pluginInfos = plugins.Select(p => new PluginInfo(
+            p.Name,
+            p.Version,
+            p.Description,
+            p.Author,
+            p.IsEnabled,
+            DateTime.UtcNow // Vereinfacht
+        ));
+        
+        return Results.Ok(pluginInfos);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting plugins: {ex.Message}");
+        return Results.Problem("Failed to get plugins");
+    }
+});
+
+app.MapGet("/api/plugins/{name}", async (string name, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IPluginManager pluginManager) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "plugins.view"))
+        return Results.Forbid();
+    
+    try
+    {
+        var plugin = await pluginManager.GetPluginAsync(name);
+        if (plugin == null) return Results.NotFound();
+        
+        var pluginInfo = new PluginInfo(
+            plugin.Name,
+            plugin.Version,
+            plugin.Description,
+            plugin.Author,
+            plugin.IsEnabled,
+            DateTime.UtcNow
+        );
+        
+        return Results.Ok(pluginInfo);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting plugin: {ex.Message}");
+        return Results.Problem("Failed to get plugin");
+    }
+});
+
+app.MapPost("/api/plugins/{name}/enable", async (string name, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IPluginManager pluginManager) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "plugins.manage"))
+        return Results.Forbid();
+    
+    try
+    {
+        await pluginManager.EnablePluginAsync(name);
+        return Results.Ok(new { success = true, message = $"Plugin {name} enabled" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error enabling plugin: {ex.Message}");
+        return Results.Problem("Failed to enable plugin");
+    }
+});
+
+app.MapPost("/api/plugins/{name}/disable", async (string name, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IPluginManager pluginManager) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "plugins.manage"))
+        return Results.Forbid();
+    
+    try
+    {
+        await pluginManager.DisablePluginAsync(name);
+        return Results.Ok(new { success = true, message = $"Plugin {name} disabled" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error disabling plugin: {ex.Message}");
+        return Results.Problem("Failed to disable plugin");
+    }
+});
+
+app.MapPost("/api/plugins/{name}/reload", async (string name, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IPluginManager pluginManager) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "plugins.manage"))
+        return Results.Forbid();
+    
+    try
+    {
+        await pluginManager.ReloadPluginAsync(name);
+        return Results.Ok(new { success = true, message = $"Plugin {name} reloaded" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error reloading plugin: {ex.Message}");
+        return Results.Problem("Failed to reload plugin");
+    }
+});
+
+// Slack/Discord Integration Endpoints
+app.MapGet("/api/integrations/slack/channels", async (HttpContext context, ISlackService slackService) =>
+{
+    try
+    {
+        var channels = await slackService.GetChannelsAsync();
+        var isConfigured = slackService.IsConfigured;
+        return Results.Ok(new { channels, configured = isConfigured });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting Slack channels: {ex.Message}");
+        return Results.Problem("Failed to get Slack channels");
+    }
+}).AllowAnonymous();
+
+app.MapPost("/api/integrations/slack/send", async (SlackSendRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, ISlackService slackService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "integrations.send"))
+        return Results.Forbid();
+    
+    try
+    {
+        var success = await slackService.SendMessageAsync(request.Channel, request.Message, request.ThreadTs);
+        return Results.Ok(new { success, message = success ? "Message sent successfully" : "Failed to send message" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error sending Slack message: {ex.Message}");
+        return Results.Problem("Failed to send Slack message");
+    }
+});
+
+app.MapGet("/api/integrations/discord/channels", async (HttpContext context, IDiscordService discordService) =>
+{
+    try
+    {
+        var channels = await discordService.GetChannelsAsync();
+        var isConfigured = discordService.IsConfigured;
+        return Results.Ok(new { channels, configured = isConfigured });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error getting Discord channels: {ex.Message}");
+        return Results.Problem("Failed to get Discord channels");
+    }
+}).AllowAnonymous();
+
+app.MapPost("/api/integrations/discord/send", async (DiscordSendRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IDiscordService discordService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "integrations.send"))
+        return Results.Forbid();
+    
+    try
+    {
+        var success = await discordService.SendMessageAsync(request.ChannelId, request.Message);
+        return Results.Ok(new { success, message = success ? "Message sent successfully" : "Failed to send message" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error sending Discord message: {ex.Message}");
+        return Results.Problem("Failed to send Discord message");
+    }
+});
+
+// Integration Configuration Endpoints
+app.MapPost("/api/integrations/slack/configure", async (SlackConfigRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, ISlackService slackService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "integrations.manage"))
+        return Results.Forbid();
+    
+    try
+    {
+        var success = await slackService.ConfigureAsync(request.BotToken, request.WebhookUrl);
+        return Results.Ok(new { success, message = success ? "Slack configured successfully" : "Failed to configure Slack" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error configuring Slack: {ex.Message}");
+        return Results.Problem("Failed to configure Slack");
+    }
+});
+
+app.MapPost("/api/integrations/discord/configure", async (DiscordConfigRequest request, HttpContext context, IUserService userService, IUserRoleService roleService, IJwtTokenService jwtService, IDiscordService discordService) =>
+{
+    var user = await GetCurrentUserAsync(context, userService, jwtService);
+    if (user == null) return Results.Unauthorized();
+    
+    if (!await roleService.UserHasPermissionAsync(user.Id, "integrations.manage"))
+        return Results.Forbid();
+    
+    try
+    {
+        var success = await discordService.ConfigureAsync(request.BotToken, request.WebhookUrl);
+        return Results.Ok(new { success, message = success ? "Discord configured successfully" : "Failed to configure Discord" });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error configuring Discord: {ex.Message}");
+        return Results.Problem("Failed to configure Discord");
+    }
+});
+
+app.MapGet("/api/integrations/slack/status", async (HttpContext context, ISlackService slackService) =>
+{
+    try
+    {
+        var isConfigured = slackService.IsConfigured;
+        var testResult = isConfigured ? await slackService.TestConnectionAsync() : false;
+        return Results.Ok(new { configured = isConfigured, connected = testResult });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error checking Slack status: {ex.Message}");
+        return Results.Problem("Failed to check Slack status");
+    }
+}).AllowAnonymous();
+
+app.MapGet("/api/integrations/discord/status", async (HttpContext context, IDiscordService discordService) =>
+{
+    try
+    {
+        var isConfigured = discordService.IsConfigured;
+        var testResult = isConfigured ? await discordService.TestConnectionAsync() : false;
+        return Results.Ok(new { configured = isConfigured, connected = testResult });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error checking Discord status: {ex.Message}");
+        return Results.Problem("Failed to check Discord status");
+    }
+}).AllowAnonymous();
+
 // Initialize services and default data
 await using var initScope = app.Services.CreateAsyncScope();
 var initUserService = initScope.ServiceProvider.GetRequiredService<IUserService>();
 var initUserRoleService = initScope.ServiceProvider.GetRequiredService<IUserRoleService>();
 var initTemplateService = initScope.ServiceProvider.GetRequiredService<IChatTemplateService>();
 var initHealthService = initScope.ServiceProvider.GetRequiredService<IHealthMonitoringService>();
+var initPluginManager = initScope.ServiceProvider.GetRequiredService<IPluginManager>();
 
 // Initialize default data
 await initUserRoleService.InitializeDefaultRolesAsync(); // Initialize roles first
 await initUserService.InitializeDefaultUsersAsync();
 await initTemplateService.SeedBuiltInTemplatesAsync();
 await initHealthService.StartHealthMonitoringAsync();
+await initPluginManager.LoadPluginsAsync();
 
 app.Run();

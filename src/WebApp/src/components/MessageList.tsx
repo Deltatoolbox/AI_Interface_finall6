@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { tomorrow, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { InlineMath, BlockMath } from 'react-katex'
@@ -38,9 +39,12 @@ export function MessageList({ messages }: MessageListProps) {
   const isDarkMode = document.documentElement.classList.contains('dark')
   const codeTheme = isDarkMode ? vscDarkPlus : tomorrow
 
-  // Function to render LaTeX math expressions
+  // Function to render LaTeX math expressions only when needed
   const renderMathContent = (content: string) => {
     if (!content || typeof content !== 'string') return content
+    
+    // Only process if content contains LaTeX delimiters
+    if (!content.includes('$')) return content
     
     // Split content by LaTeX delimiters
     const parts = content.split(/(\$\$[\s\S]*?\$\$|\$[^$]*?\$)/g)
@@ -159,9 +163,10 @@ export function MessageList({ messages }: MessageListProps) {
                 {getMessageIcon(message.role)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-gray-800 dark:text-gray-200 [&_h1]:text-gray-900 dark:[&_h1]:text-gray-100 [&_h2]:text-gray-900 dark:[&_h2]:text-gray-100 [&_h3]:text-gray-900 dark:[&_h3]:text-gray-100 [&_h4]:text-gray-900 dark:[&_h4]:text-gray-100 [&_h5]:text-gray-900 dark:[&_h5]:text-gray-100 [&_h6]:text-gray-900 dark:[&_h6]:text-gray-100 [&_p]:text-gray-800 dark:[&_p]:text-gray-200 [&_strong]:text-gray-900 dark:[&_strong]:text-gray-100 [&_em]:text-gray-800 dark:[&_em]:text-gray-200 [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_blockquote]:text-gray-700 dark:[&_blockquote]:text-gray-300 [&_blockquote]:border-gray-300 dark:[&_blockquote]:border-gray-600 [&_ul]:text-gray-800 dark:[&_ul]:text-gray-200 [&_ol]:text-gray-800 dark:[&_ol]:text-gray-200 [&_li]:text-gray-800 dark:[&_li]:text-gray-200 [&_table]:border-collapse [&_table]:border [&_table]:border-gray-300 dark:[&_table]:border-gray-600 [&_th]:border [&_th]:border-gray-300 dark:[&_th]:border-gray-600 [&_th]:bg-gray-50 dark:[&_th]:bg-gray-700 [&_th]:px-4 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_td]:border [&_td]:border-gray-300 dark:[&_td]:border-gray-600 [&_td]:px-4 [&_td]:py-2">
+                <div className="text-gray-800 dark:text-gray-200 [&_h1]:text-gray-900 dark:[&_h1]:text-gray-100 [&_h2]:text-gray-900 dark:[&_h2]:text-gray-100 [&_h3]:text-gray-900 dark:[&_h3]:text-gray-100 [&_h4]:text-gray-900 dark:[&_h4]:text-gray-100 [&_h5]:text-gray-900 dark:[&_h5]:text-gray-100 [&_h6]:text-gray-900 dark:[&_h6]:text-gray-100 [&_p]:text-gray-800 dark:[&_p]:text-gray-200 [&_strong]:text-gray-900 dark:[&_strong]:text-gray-100 [&_em]:text-gray-800 dark:[&_em]:text-gray-200 [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_blockquote]:text-gray-700 dark:[&_blockquote]:text-gray-300 [&_blockquote]:border-gray-300 dark:[&_blockquote]:border-gray-600 [&_ul]:text-gray-800 dark:[&_ul]:text-gray-200 [&_ol]:text-gray-800 dark:[&_ol]:text-gray-200 [&_li]:text-gray-800 dark:[&_li]:text-gray-200">
                   {message.role === 'assistant' ? (
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       components={{
                         code({ node, className, children, ...props }: any) {
                           const match = /language-(\w+)/.exec(className || '')
@@ -181,30 +186,47 @@ export function MessageList({ messages }: MessageListProps) {
                           )
                         },
                         p({ children, ...props }: any) {
-                          return <p {...props}>{renderMathContent(String(children))}</p>
+                          const content = String(children)
+                          if (content.includes('$')) {
+                            return <p {...props}>{renderMathContent(content)}</p>
+                          }
+                          return <p {...props}>{children}</p>
                         },
                         span({ children, ...props }: any) {
-                          return <span {...props}>{renderMathContent(String(children))}</span>
+                          const content = String(children)
+                          if (content.includes('$')) {
+                            return <span {...props}>{renderMathContent(content)}</span>
+                          }
+                          return <span {...props}>{children}</span>
                         },
                         table({ children, ...props }: any) {
                           return (
-                            <div className="overflow-x-auto my-4">
-                              <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600" {...props}>
+                            <div className="overflow-x-auto my-4 rounded-lg border border-gray-300 dark:border-gray-600">
+                              <table className="min-w-full border-collapse" {...props}>
                                 {children}
                               </table>
                             </div>
                           )
                         },
+                        thead({ children, ...props }: any) {
+                          return <thead className="bg-gray-50 dark:bg-gray-700" {...props}>{children}</thead>
+                        },
+                        tbody({ children, ...props }: any) {
+                          return <tbody {...props}>{children}</tbody>
+                        },
+                        tr({ children, ...props }: any) {
+                          return <tr className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800" {...props}>{children}</tr>
+                        },
                         th({ children, ...props }: any) {
                           return (
-                            <th className="border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-2 text-left font-semibold" {...props}>
+                            <th className="border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-left font-semibold text-gray-900 dark:text-gray-100" {...props}>
                               {children}
                             </th>
                           )
                         },
                         td({ children, ...props }: any) {
                           return (
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2" {...props}>
+                            <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 text-gray-800 dark:text-gray-200" {...props}>
                               {children}
                             </td>
                           )
@@ -215,6 +237,7 @@ export function MessageList({ messages }: MessageListProps) {
                     </ReactMarkdown>
                   ) : (
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       components={{
                         code({ node, className, children, ...props }: any) {
                           const match = /language-(\w+)/.exec(className || '')
@@ -234,30 +257,47 @@ export function MessageList({ messages }: MessageListProps) {
                           )
                         },
                         p({ children, ...props }: any) {
-                          return <p {...props}>{renderMathContent(String(children))}</p>
+                          const content = String(children)
+                          if (content.includes('$')) {
+                            return <p {...props}>{renderMathContent(content)}</p>
+                          }
+                          return <p {...props}>{children}</p>
                         },
                         span({ children, ...props }: any) {
-                          return <span {...props}>{renderMathContent(String(children))}</span>
+                          const content = String(children)
+                          if (content.includes('$')) {
+                            return <span {...props}>{renderMathContent(content)}</span>
+                          }
+                          return <span {...props}>{children}</span>
                         },
                         table({ children, ...props }: any) {
                           return (
-                            <div className="overflow-x-auto my-4">
-                              <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600" {...props}>
+                            <div className="overflow-x-auto my-4 rounded-lg border border-gray-300 dark:border-gray-600">
+                              <table className="min-w-full border-collapse" {...props}>
                                 {children}
                               </table>
                             </div>
                           )
                         },
+                        thead({ children, ...props }: any) {
+                          return <thead className="bg-gray-50 dark:bg-gray-700" {...props}>{children}</thead>
+                        },
+                        tbody({ children, ...props }: any) {
+                          return <tbody {...props}>{children}</tbody>
+                        },
+                        tr({ children, ...props }: any) {
+                          return <tr className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800" {...props}>{children}</tr>
+                        },
                         th({ children, ...props }: any) {
                           return (
-                            <th className="border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-2 text-left font-semibold" {...props}>
+                            <th className="border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-3 text-left font-semibold text-gray-900 dark:text-gray-100" {...props}>
                               {children}
                             </th>
                           )
                         },
                         td({ children, ...props }: any) {
                           return (
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2" {...props}>
+                            <td className="border-r border-gray-200 dark:border-gray-600 px-4 py-3 text-gray-800 dark:text-gray-200" {...props}>
                               {children}
                             </td>
                           )

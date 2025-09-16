@@ -1,211 +1,188 @@
-# LM Studio Chat Gateway
+# LM Gateway System - Local Development
 
-Ein production-ready LAN Gateway für LM Studio mit .NET 8 Backend und React Frontend.
+This repository contains a complete LM Gateway System with React frontend, ASP.NET Core backend, and Caddy reverse proxy for local development.
 
-## 🚀 Features
+## Features
 
-### Backend (.NET 8)
-- **ASP.NET Core Minimal APIs** mit Kestrel
-- **JWT Authentication** mit konfigurierbaren Einstellungen
-- **SQLite Database** mit Entity Framework Core
-- **User Management** mit Admin/User Rollen
-- **LM Studio Integration** über OpenAI-kompatible API
-- **BCrypt Password Hashing** für sichere Passwörter
-- **CORS Support** für Frontend-Integration
+- **Frontend**: React with TypeScript, modern UI components
+- **Backend**: ASP.NET Core Minimal APIs with SQLite database
+- **Reverse Proxy**: Caddy for HTTPS termination and routing
+- **Authentication**: JWT-based authentication with role-based access control
+- **End-to-End Encryption**: AES-256-GCM encryption for chat messages
+- **Webhooks**: Event-driven notifications to external systems
+- **Integrations**: Slack and Discord integration
+- **Admin Panel**: Complete administration interface
+- **Backup System**: Automated backup and restore functionality
 
-### Frontend (React + TypeScript)
-- **React 18** mit Vite Build System
-- **TypeScript** für Type Safety
-- **TailwindCSS** für modernes Styling
-- **JWT Token Management** mit Cookie-basierter Authentifizierung
-- **Real-time Chat** mit Server-Sent Events (SSE)
-- **Markdown Rendering** mit Syntax Highlighting
-- **Responsive Design** für alle Geräte
+## Prerequisites
 
-### User Management
-- **Konfigurierbare Registrierung** (Admin-only oder Self-Registration)
-- **Rollen-basierte Zugriffskontrolle** (Admin/User)
-- **Admin Dashboard** mit Statistiken
-- **User Management UI** für Admin-Benutzer
+- **.NET 8 SDK**: [Download here](https://dotnet.microsoft.com/download)
+- **Node.js 18+**: [Download here](https://nodejs.org/)
+- **Caddy**: Will be installed automatically by the setup script
 
-## 🛠️ Tech Stack
+## Quick Start
 
-### Backend
-- .NET 8
-- ASP.NET Core Minimal APIs
-- Entity Framework Core
-- SQLite Database
-- JWT Bearer Authentication
-- BCrypt.Net-Next
-- Serilog
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd AI_Interface
+   ```
 
-### Frontend
-- React 18
-- TypeScript
-- Vite
-- TailwindCSS
-- React Router
-- Lucide React Icons
-- react-markdown
-- react-syntax-highlighter
+2. **Run the setup script:**
+   ```bash
+   ./setup-local.sh
+   ```
 
-## 📁 Projektstruktur
+3. **Access your application:**
+   - Frontend: http://localhost
+   - Backend API: http://localhost:5058
+   - API via Caddy: http://localhost/api
 
-```
-AI_Interface/
-├── src/
-│   ├── SimpleGateway/          # .NET 8 Backend
-│   │   ├── Program.cs          # Main entry point
-│   │   ├── Models/             # Entity models
-│   │   ├── Services/           # Business logic
-│   │   ├── DTOs/               # Data Transfer Objects
-│   │   └── Configuration/      # Settings classes
-│   └── WebApp/                 # React Frontend
-│       ├── src/
-│       │   ├── components/     # React components
-│       │   ├── pages/          # Page components
-│       │   ├── contexts/      # React contexts
-│       │   └── api.ts          # API client
-│       └── package.json
-├── start.sh                    # Start script
-├── stop.sh                     # Stop script
-└── status.sh                   # Status script
-```
+4. **Stop services:**
+   ```bash
+   ./stop-local.sh
+   ```
 
-## 🚀 Quick Start
+## Manual Setup (Alternative)
 
-### Voraussetzungen
-- .NET 8 SDK
-- Node.js 18+
-- LM Studio (mit heruntergeladenen Modellen)
+If you prefer to set up manually:
 
-### Installation
+1. **Install Caddy:**
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+   sudo apt-get update
+   sudo apt-get install -y caddy
+   ```
 
-1. **Backend starten:**
+2. **Build and start backend:**
+   ```bash
+   cd src/SimpleGateway
+   dotnet run --urls="http://localhost:5058"
+   ```
+
+3. **Build frontend:**
+   ```bash
+   cd src/WebApp
+   npm install
+   npm run build
+   cp -r dist/* ../../dist/
+   ```
+
+4. **Start Caddy:**
+   ```bash
+   caddy run --config Caddyfile
+   ```
+
+## Configuration
+
+### Caddy Configuration
+
+The `Caddyfile` is configured for localhost development with:
+- HTTP on port 80
+- HTTPS on port 443 (optional, with self-signed certificates)
+- Reverse proxy to backend on port 5058
+- Static file serving for frontend
+- Security headers and CORS configuration
+
+### Backend Configuration
+
+The backend runs on port 5058 and includes:
+- SQLite database (automatically created)
+- JWT authentication
+- Role-based access control
+- Webhook system
+- Encryption services
+
+### Frontend Configuration
+
+The React frontend is built and served as static files through Caddy.
+
+## Default Login
+
+- **Username**: admin
+- **Password**: admin
+
+## API Endpoints
+
+- **Authentication**: `/api/auth/*`
+- **Users**: `/api/users/*`
+- **Conversations**: `/api/conversations/*`
+- **Chat**: `/api/chat`
+- **Admin**: `/api/admin/*`
+- **Webhooks**: `/api/webhooks/*`
+- **Integrations**: `/api/integrations/*`
+- **Health**: `/api/health`
+
+## Development
+
+### Backend Development
+
 ```bash
 cd src/SimpleGateway
-dotnet run
+dotnet watch run --urls="http://localhost:5058"
 ```
 
-2. **Frontend starten:**
+### Frontend Development
+
 ```bash
 cd src/WebApp
-npm install
 npm run dev
 ```
 
-3. **Oder mit Scripts:**
+### Database Migrations
+
 ```bash
-./start.sh
-```
-
-## ⚙️ Konfiguration
-
-### Backend (appsettings.json)
-```json
-{
-  "JwtSettings": {
-    "SecretKey": "your-secret-key",
-    "Issuer": "LM-Gateway",
-    "Audience": "LM-Gateway-Users",
-    "ExpirationMinutes": 60
-  },
-  "UserManagement": {
-    "AllowSelfRegistration": true,
-    "RequireEmailVerification": false,
-    "DefaultRole": "User"
-  }
-}
-```
-
-### Frontend (vite.config.ts)
-- Proxy-Konfiguration für API-Calls
-- Development Server auf Port 5173
-- Backend API auf Port 5000
-
-## 🔐 Authentifizierung
-
-Das System verwendet JWT-Token für die Authentifizierung:
-- Token werden als HttpOnly Cookies gespeichert
-- Automatische Token-Erneuerung
-- Rollen-basierte Zugriffskontrolle
-
-## 📊 Admin Features
-
-- **Dashboard** mit System-Statistiken
-- **User Management** für Benutzerverwaltung
-- **Real-time Monitoring** der aktiven Verbindungen
-- **Model Usage Tracking**
-
-## 🎯 API Endpoints
-
-### Authentication
-- `POST /api/auth/login` - Benutzer-Login
-- `POST /api/auth/register` - Benutzer-Registrierung
-
-### Chat
-- `GET /api/conversations` - Gespräche abrufen
-- `POST /api/conversations` - Neues Gespräch erstellen
-- `PUT /api/conversations/{id}` - Gespräch umbenennen
-- `POST /api/chat` - Chat-Nachricht senden
-
-### Admin
-- `GET /api/admin/stats` - System-Statistiken
-- `GET /api/admin/users` - Benutzer auflisten
-- `POST /api/admin/users` - Benutzer erstellen
-- `PUT /api/admin/users/{id}` - Benutzer aktualisieren
-- `DELETE /api/admin/users/{id}` - Benutzer löschen
-
-## 🚀 Deployment
-
-### Production Build
-```bash
-# Backend
 cd src/SimpleGateway
-dotnet publish -c Release
-
-# Frontend
-cd src/WebApp
-npm run build
+dotnet ef migrations add <MigrationName>
+dotnet ef database update
 ```
 
-### Docker (Optional)
-Das Projekt kann mit Docker containerisiert werden.
+## Troubleshooting
 
-## 📝 Entwicklung
+### Port Conflicts
 
-### Debugging
-- Backend: `dotnet run` mit Debug-Logs
-- Frontend: `npm run dev` mit Hot Reload
-- Debug-Seite: `/debug` für Auth-Status
+If ports 80 or 5058 are in use:
+- Change the backend port in `src/SimpleGateway/Properties/launchSettings.json`
+- Update the Caddyfile to proxy to the new port
+- Or stop conflicting services
 
-### Testing
-- API-Tests mit curl oder Postman
-- Frontend-Tests mit Browser DevTools
+### Caddy Issues
 
-## 🤝 Contributing
+- Test configuration: `caddy validate --config Caddyfile`
+- Check logs: `caddy run --config Caddyfile --watch`
+- Reload configuration: `caddy reload --config Caddyfile`
 
-1. Fork das Repository
-2. Erstelle einen Feature-Branch
-3. Committe deine Änderungen
-4. Push zum Branch
-5. Erstelle einen Pull Request
+### Backend Issues
 
-## 📄 Lizenz
+- Check if .NET 8 SDK is installed: `dotnet --version`
+- Restore packages: `dotnet restore`
+- Check database: The SQLite file is created automatically
 
-Dieses Projekt steht unter der MIT-Lizenz.
+### Frontend Issues
 
-## 🎉 Meilensteine
+- Check Node.js version: `node --version`
+- Clear cache: `npm cache clean --force`
+- Reinstall dependencies: `rm -rf node_modules && npm install`
 
-- ✅ **MVP Backend** mit LM Studio Integration
-- ✅ **React Frontend** mit Chat-Interface
-- ✅ **SQLite Database** mit Persistierung
-- ✅ **JWT Authentication** mit User Management
-- ✅ **Admin Dashboard** mit Statistiken
-- ✅ **User Management UI** für Admin-Benutzer
-- ✅ **Navigation** zwischen allen Seiten
-- ✅ **Production-ready** Architektur
+## Security Notes
 
----
+- This setup is for **local development only**
+- Default admin credentials should be changed in production
+- HTTPS is optional for localhost development
+- Database is SQLite (file-based, not suitable for production)
 
-**Entwickelt mit ❤️ für die LM Studio Community**
+## Production Deployment
+
+For production deployment, consider:
+- Using a real domain with Let's Encrypt certificates
+- PostgreSQL or SQL Server instead of SQLite
+- Proper secrets management
+- Environment-specific configurations
+- Load balancing and scaling
+
+## License
+
+[Your License Here]

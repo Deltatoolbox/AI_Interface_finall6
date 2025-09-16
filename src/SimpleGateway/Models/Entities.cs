@@ -39,6 +39,9 @@ public class User
     
     public bool EncryptionEnabled { get; set; } = false;
     public int KeyRotationDays { get; set; } = 90;
+    public DateTime? EncryptionEnabledAt { get; set; }
+    public DateTime? EncryptionDisabledAt { get; set; }
+    public DateTime? LastKeyRotation { get; set; }
     
     public bool DataCollectionConsent { get; set; } = false;
     public bool AnalyticsConsent { get; set; } = false;
@@ -56,6 +59,7 @@ public class User
     public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
     public virtual ICollection<ChatTemplate> CreatedTemplates { get; set; } = new List<ChatTemplate>();
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+    public virtual ICollection<EncryptionKey> EncryptionKeys { get; set; } = new List<EncryptionKey>();
     public virtual UserRole? UserRole { get; set; }
 }
 
@@ -256,12 +260,11 @@ public class EncryptionKey
     [Required]
     public string UserId { get; set; } = string.Empty;
     [Required]
-    public string PublicKey { get; set; } = string.Empty;
-    [Required]
-    public string EncryptedPrivateKey { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime ExpiresAt { get; set; }
+    public string Key { get; set; } = string.Empty; // Base64 encoded AES-256 key
+    public int Version { get; set; } = 1;
     public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeactivatedAt { get; set; }
     
     // Navigation Properties
     public virtual User User { get; set; } = null!;
@@ -321,4 +324,50 @@ public class ConsentRecord
     
     // Navigation Properties
     public virtual User User { get; set; } = null!;
+}
+
+public class Webhook
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string Name { get; set; } = string.Empty;
+    [Required]
+    public string Url { get; set; } = string.Empty;
+    [Required]
+    public string Secret { get; set; } = string.Empty;
+    [Required]
+    public string Events { get; set; } = string.Empty; // JSON array of event types
+    public bool IsActive { get; set; } = true;
+    public int RetryCount { get; set; } = 3;
+    public int TimeoutSeconds { get; set; } = 30;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string? Description { get; set; }
+    public string? CreatedBy { get; set; }
+    
+    // Navigation Properties
+    public virtual ICollection<WebhookDelivery> Deliveries { get; set; } = new List<WebhookDelivery>();
+}
+
+public class WebhookDelivery
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Required]
+    public string WebhookId { get; set; } = string.Empty;
+    [Required]
+    public string EventType { get; set; } = string.Empty;
+    [Required]
+    public string Payload { get; set; } = string.Empty; // JSON payload
+    [Required]
+    public string Status { get; set; } = "pending"; // pending, delivered, failed
+    public int Attempts { get; set; } = 0;
+    public int? ResponseCode { get; set; }
+    public string? ResponseBody { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeliveredAt { get; set; }
+    public DateTime? NextRetryAt { get; set; }
+    
+    // Navigation Properties
+    public virtual Webhook Webhook { get; set; } = null!;
 }

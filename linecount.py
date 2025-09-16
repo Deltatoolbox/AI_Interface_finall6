@@ -11,6 +11,9 @@ def count_lines_in_file(file_path: Path) -> int:
     Returns:
         int: Number of lines, including blank lines. Returns 0 on error.
     """
+    if not file_path.suffix == ".cs" | file_path.suffix == ".json" | file_path.suffix == ".tsx" | file_path.suffix == ".ts" | file_path.suffix == ".jsx" | file_path.suffix == ".js" | file_path.suffix == ".md" | file_path.suffix == ".txt" | file_path.suffix == ".yaml" | file_path.suffix == ".yml" | file_path.suffix == ".html":
+        return 0
+
     if file_path.is_symlink():
         return 0
     try:
