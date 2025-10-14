@@ -18,9 +18,9 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
-        Title = "LM Gateway API",
+        Title = "AIGS API",
         Version = "v1",
-        Description = "API für das LM Gateway System mit Chat, User Management, Webhooks und mehr"
+        Description = "API für das AIGS mit Chat, User Management, Webhooks und mehr"
     });
     
     // JWT Authentication für Swagger
@@ -127,7 +127,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "LM Gateway API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AIGS API v1");
         c.RoutePrefix = "api-docs"; // Swagger UI unter /api-docs verfügbar
     });
 }
@@ -156,7 +156,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapGet("/", () => "LM Gateway API is running!");
+app.MapGet("/", () => "AIGS API is running!");
 
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
 
@@ -316,8 +316,8 @@ app.MapPost("/api/auth/login", async (LoginRequest request, HttpContext context,
             HttpOnly = false,
             Secure = false,
             SameSite = SameSiteMode.Lax,
-            Expires = DateTime.UtcNow.AddHours(24),
-            Domain = "localhost"
+            Expires = DateTime.UtcNow.AddHours(24)
+            // Domain removed to work with 0.0.0.0
         });
         
         var userResponse = new UserResponse(user.Id, user.Username, user.Email, user.Role, user.CreatedAt);
@@ -2073,9 +2073,9 @@ app.MapGet("/api/v1/status", () => Results.Ok(new {
 }));
 
 app.MapGet("/api/v1/info", () => Results.Ok(new {
-    name = "LM Gateway API",
+    name = "AIGS API",
     version = "1.0.0",
-    description = "API für das LM Gateway System",
+    description = "API für das AIGS",
     endpoints = new {
         authentication = "/api/auth/*",
         users = "/api/users/*",

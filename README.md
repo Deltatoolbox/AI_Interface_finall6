@@ -1,6 +1,6 @@
-# LM Gateway System - Local Development
+# AIGS - Local Development
 
-This repository contains a complete LM Gateway System with React frontend, ASP.NET Core backend, and Caddy reverse proxy for local development.
+This repository contains a complete AIGS with React frontend, ASP.NET Core backend, and Caddy reverse proxy for local development.
 
 ## Features
 

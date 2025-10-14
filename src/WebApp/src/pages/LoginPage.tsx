@@ -35,7 +35,7 @@ export default function LoginPage() {
             <LogIn className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
-            Sign in to LM Gateway
+            Sign in to AIGS
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             Access your AI chat interface

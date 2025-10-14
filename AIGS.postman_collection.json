@@ -1,8 +1,8 @@
 {
-  "name": "lm-gateway-postman-collection",
+  "name": "aigs-postman-collection",
   "info": {
-    "name": "LM Gateway API",
-    "description": "Collection for testing LM Gateway API endpoints",
+    "name": "AIGS API",
+    "description": "Collection for testing AIGS API endpoints",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

@@ -1,8 +1,8 @@
-# LM Gateway - Security Guide
+# AIGS - Security Guide
 
 ## Overview
 
-This guide covers security considerations and best practices for deploying LM Gateway in production environments.
+This guide covers security considerations and best practices for deploying AIGS in production environments.
 
 ## Authentication & Authorization
 
@@ -133,7 +133,7 @@ ENTRYPOINT ["dumb-init", "--"]
       {
         "Name": "File",
         "Args": {
-          "path": "/var/log/lm-gateway/security-.log",
+          "path": "/var/log/aigs/security-.log",
           "rollingInterval": "Day"
         }
       }

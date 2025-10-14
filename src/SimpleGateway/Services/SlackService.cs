@@ -54,7 +54,7 @@ public class SlackService : ISlackService
                 // Test webhook
                 var testPayload = new
                 {
-                    text = "Test message from LM Gateway"
+                    text = "Test message from AIGS"
                 };
                 
                 var json = JsonSerializer.Serialize(testPayload);

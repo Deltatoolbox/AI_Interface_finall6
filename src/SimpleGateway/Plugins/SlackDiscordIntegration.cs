@@ -15,7 +15,7 @@ public class SlackIntegrationPlugin : INotificationPlugin
     public string Name => "Slack Integration Plugin";
     public string Version => "1.0.0";
     public string Description => "Integration with Slack for sending notifications";
-    public string Author => "LM Gateway Team";
+    public string Author => "AIGS Team";
     public bool IsEnabled { get; set; } = true;
 
     public async Task InitializeAsync()
@@ -72,7 +72,7 @@ public class DiscordIntegrationPlugin : INotificationPlugin
     public string Name => "Discord Integration Plugin";
     public string Version => "1.0.0";
     public string Description => "Integration with Discord for sending notifications";
-    public string Author => "LM Gateway Team";
+    public string Author => "AIGS Team";
     public bool IsEnabled { get; set; } = true;
 
     public async Task InitializeAsync()

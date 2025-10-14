@@ -1,6 +1,6 @@
-# LM Gateway Postman Collection
+# AIGS Postman Collection
 
-This collection provides examples for testing the LM Gateway API endpoints.
+This collection provides examples for testing the AIGS API endpoints.
 
 ## Setup
 

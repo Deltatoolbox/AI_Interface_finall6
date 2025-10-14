@@ -1,8 +1,8 @@
-# LM Gateway - Monitoring & Observability
+# AIGS - Monitoring & Observability
 
 ## Overview
 
-LM Gateway includes comprehensive monitoring and observability features using OpenTelemetry, Prometheus metrics, and structured logging with Serilog.
+AIGS includes comprehensive monitoring and observability features using OpenTelemetry, Prometheus metrics, and structured logging with Serilog.
 
 ## Metrics
 
@@ -34,7 +34,7 @@ Create a Grafana dashboard with these panels:
 ```json
 {
   "dashboard": {
-    "title": "LM Gateway Dashboard",
+    "title": "AIGS Dashboard",
     "panels": [
       {
         "title": "Request Rate",
@@ -105,7 +105,7 @@ All logs are written in JSON format for easy parsing:
 - File output to `./logs/gateway-{date}.log`
 
 #### Production
-- File output to `/opt/lm-gateway/logs/gateway-{date}.log`
+- File output to `/opt/aigs/logs/gateway-{date}.log`
 - Systemd journal integration
 - Optional: Centralized logging (ELK stack, Fluentd, etc.)
 
@@ -218,7 +218,7 @@ builder.Services.AddHealthChecks()
 
 ```yaml
 groups:
-- name: lm-gateway
+- name: aigs
   rules:
   - alert: HighErrorRate
     expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
@@ -237,12 +237,12 @@ groups:
       summary: "High response time detected"
       
   - alert: ServiceDown
-    expr: up{job="lm-gateway"} == 0
+    expr: up{job="aigs"} == 0
     for: 1m
     labels:
       severity: critical
     annotations:
-      summary: "LM Gateway service is down"
+      summary: "AIGS service is down"
 ```
 
 ### Alertmanager Configuration
@@ -321,10 +321,10 @@ Monitor these metrics for capacity planning:
 
 ```bash
 # Check service status
-systemctl status lm-gateway
+systemctl status aigs
 
 # View recent logs
-journalctl -u lm-gateway -f
+journalctl -u aigs -f
 
 # Check metrics
 curl http://localhost:5000/metrics

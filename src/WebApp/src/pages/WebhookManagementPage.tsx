@@ -269,7 +269,7 @@ export default function WebhookManagementPage() {
         payload: {
           test: true,
           timestamp: new Date().toISOString(),
-          message: 'This is a test webhook from LM Gateway'
+          message: 'This is a test webhook from AIGS'
         }
       });
       setTestResult(result);

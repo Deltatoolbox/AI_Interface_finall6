@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# LM Gateway Status Script
+# AIGS Status Script
 # Zeigt den Status aller Services
 
-echo "📊 LM Gateway Services Status"
+echo "📊 AIGS Services Status"
 echo "=============================="
 echo ""
 

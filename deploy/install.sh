@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# LM Gateway Deployment Script
-# This script sets up the LM Gateway service on Ubuntu
+# AIGS Deployment Script
+# This script sets up the AIGS service on Ubuntu
 
 set -e
 
@@ -12,17 +12,17 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-SERVICE_NAME="lm-gateway"
-SERVICE_USER="lm-gateway"
-SERVICE_GROUP="lm-gateway"
-INSTALL_DIR="/opt/lm-gateway"
-DATA_DIR="/opt/lm-gateway/data"
-LOGS_DIR="/opt/lm-gateway/logs"
+SERVICE_NAME="aigs"
+SERVICE_USER="aigs"
+SERVICE_GROUP="aigs"
+INSTALL_DIR="/opt/aigs"
+DATA_DIR="/opt/aigs/data"
+LOGS_DIR="/opt/aigs/logs"
 CONFIG_DIR="/etc"
-SERVICE_FILE="/etc/systemd/system/lm-gateway.service"
-ENV_FILE="/etc/lm-gateway.env"
+SERVICE_FILE="/etc/systemd/system/aigs.service"
+ENV_FILE="/etc/aigs.env"
 
-echo -e "${GREEN}LM Gateway Deployment Script${NC}"
+echo -e "${GREEN}AIGS Deployment Script${NC}"
 echo "=================================="
 
 # Check if running as root
@@ -70,12 +70,12 @@ echo -e "${GREEN}Directories created and permissions set${NC}"
 
 # Copy service file
 echo -e "${YELLOW}Installing systemd service...${NC}"
-cp deploy/systemd/lm-gateway.service $SERVICE_FILE
+cp deploy/systemd/aigs.service $SERVICE_FILE
 chmod 644 $SERVICE_FILE
 
 # Copy environment file
 echo -e "${YELLOW}Installing environment configuration...${NC}"
-cp deploy/lm-gateway.env $ENV_FILE
+cp deploy/aigs.env $ENV_FILE
 chmod 600 $ENV_FILE
 chown root:root $ENV_FILE
 

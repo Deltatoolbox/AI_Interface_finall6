@@ -1,4 +1,4 @@
-# LM Gateway - Development Quick Start
+# AIGS - Development Quick Start
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@
 
 ```bash
 git clone <repository-url>
-cd lm-gateway
+cd AI_Interface
 dotnet restore
 ```
 

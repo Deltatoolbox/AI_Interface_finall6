@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# LM Gateway Local Stop Script
+# AIGS Local Stop Script
 # This script stops all local services
 
 set -e
@@ -29,7 +29,7 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-log_info "Stopping LM Gateway services..."
+log_info "Stopping AIGS services..."
 
 # Stop backend if running
 if [ -f .backend.pid ]; then

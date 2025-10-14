@@ -1,28 +1,28 @@
 [Unit]
-Description=LM Gateway - LAN Chat Gateway for LM Studio
-Documentation=https://github.com/your-org/lm-gateway
+Description=AIGS - AI Gateway Service
+Documentation=https://github.com/your-org/aigs
 After=network.target
 Wants=network.target
 
 [Service]
 Type=notify
 NotifyAccess=all
-ExecStart=/opt/lm-gateway/LmGateway.Api
-WorkingDirectory=/opt/lm-gateway
-User=lm-gateway
-Group=lm-gateway
+ExecStart=/opt/aigs/Aigs.Api
+WorkingDirectory=/opt/aigs
+User=aigs
+Group=aigs
 
 # Environment variables
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://localhost:5000
-EnvironmentFile=/etc/lm-gateway.env
+EnvironmentFile=/etc/aigs.env
 
 # Security settings
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/lm-gateway/data /opt/lm-gateway/logs
+ReadWritePaths=/opt/aigs/data /opt/aigs/logs
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
@@ -44,7 +44,7 @@ StartLimitBurst=3
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=lm-gateway
+SyslogIdentifier=aigs
 
 [Install]
 WantedBy=multi-user.target

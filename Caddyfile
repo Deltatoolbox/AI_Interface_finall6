@@ -1,9 +1,9 @@
-# LM Gateway Caddy Configuration - Local Development
+# AIGS Caddy Configuration - Local Development
 # This configuration provides HTTPS termination, reverse proxy, and static file serving for localhost
 
 # Global configuration
 {
-    # Disable automatic HTTPS for localhost
+    # Disable automatic HTTPS for development
     auto_https off
     # Email for Let's Encrypt certificates (only needed if you use real domains later)
     email bildthomas24@gmail.com
@@ -13,7 +13,7 @@
     }
     # Logging
     log {
-        output file /var/log/caddy/access.log {
+        output file ./logs/access.log {
             roll_size 100mb
             roll_keep 5
             roll_keep_for 720h
@@ -23,8 +23,10 @@
     }
 }
 
-# Main LM Gateway - localhost (HTTP only for development)
-localhost:80 {
+# Main AIGS - accessible from all interfaces (HTTPS)
+localhost:8443 {
+    # Use self-signed certificate for localhost
+    tls internal
     # Security headers
     header {
         # Security headers
@@ -38,24 +40,24 @@ localhost:80 {
         -Server
         
         # CORS headers for API
-        Access-Control-Allow-Origin "http://localhost"
+        Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
         Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
         Access-Control-Allow-Credentials "true"
     }
     
-    # Rate limiting
-    rate_limit {
-        zone static {
-            key {remote_host}
-            events 100
-            window 1m
-        }
-    }
+    # Rate limiting (commented out - requires plugin)
+    # rate_limit {
+    #     zone static {
+    #         key {remote_host}
+    #         events 100
+    #         window 1m
+    #     }
+    # }
     
     # API routes - proxy to backend
     handle /api/* {
-        reverse_proxy localhost:5058 {
+        reverse_proxy 127.0.0.1:5058 {
             # Health check
             health_uri /api/health
             health_interval 30s
@@ -77,7 +79,7 @@ localhost:80 {
     
     # WebSocket support for real-time features
     handle /ws/* {
-        reverse_proxy localhost:5058 {
+        reverse_proxy 127.0.0.1:5058 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
@@ -103,52 +105,14 @@ localhost:80 {
     }
 }
 
-# HTTPS version for testing (optional)
-localhost:443 {
-    # Use self-signed certificate for localhost
-    tls internal
-    
-    # Same configuration as HTTP version
-    header {
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
-        X-XSS-Protection "1; mode=block"
-        Referrer-Policy "strict-origin-when-cross-origin"
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none';"
-        -Server
-        Access-Control-Allow-Origin "https://localhost"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-        Access-Control-Allow-Credentials "true"
-    }
-    
-    # API routes
-    handle /api/* {
-        reverse_proxy localhost:5058
-    }
-    
-    # WebSocket support
-    handle /ws/* {
-        reverse_proxy localhost:5058
-    }
-    
-    # Static files
-    handle /assets/* {
-        root * ./dist
-        file_server
-        header Cache-Control "public, max-age=31536000, immutable"
-    }
-    
-    # Serve frontend
-    handle {
-        root * ./dist
-        try_files {path} /index.html
-        file_server
-    }
+# HTTP redirect to HTTPS
+localhost:8080 {
+    redir https://localhost:8443{uri} permanent
 }
 
 # API-only endpoint (optional)
-api.localhost:80 {
+api.localhost:8443 {
+    tls internal
     # API-specific headers
     header {
         Access-Control-Allow-Origin "*"
@@ -157,18 +121,18 @@ api.localhost:80 {
         Access-Control-Max-Age "86400"
     }
     
-    # Rate limiting for API
-    rate_limit {
-        zone api {
-            key {remote_host}
-            events 1000
-            window 1m
-        }
-    }
+    # Rate limiting for API (commented out - requires plugin)
+    # rate_limit {
+    #     zone api {
+    #         key {remote_host}
+    #         events 1000
+    #         window 1m
+    #     }
+    # }
     
     # Only API routes
     handle /api/* {
-        reverse_proxy localhost:5058
+        reverse_proxy 127.0.0.1:5058
     }
     
     # Block everything else
@@ -178,8 +142,9 @@ api.localhost:80 {
 }
 
 # Health check endpoint
-health.localhost:80 {
+health.localhost:8443 {
+    tls internal
     handle {
-        reverse_proxy localhost:5058/api/health
+        reverse_proxy 127.0.0.1:5058/api/health
     }
 }

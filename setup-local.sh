@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# LM Gateway Local Setup Script (without Docker)
+# AIGS Local Setup Script (without Docker)
 # This script sets up Caddy for local development
 
 set -e
 
-echo "🚀 Setting up LM Gateway locally with Caddy..."
+echo "🚀 Setting up AIGS locally with Caddy..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -189,7 +189,7 @@ start_services() {
 
 # Show setup info
 show_info() {
-    log_success "LM Gateway is now running locally!"
+    log_success "AIGS is now running locally!"
     echo ""
     echo "🌐 Access your application:"
     echo "   Frontend: http://localhost"
@@ -236,7 +236,7 @@ cleanup() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --help)
-            echo "LM Gateway Local Setup Script"
+            echo "AIGS Local Setup Script"
             echo ""
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -267,7 +267,7 @@ trap cleanup EXIT
 
 # Run setup
 main() {
-    log_info "Starting LM Gateway local setup..."
+    log_info "Starting AIGS local setup..."
     
     check_dependencies
     build_frontend

@@ -1,0 +1,38 @@
+{
+    auto_https off
+    log {
+        output file ./logs/access.log
+        format json
+        level INFO
+    }
+}
+
+:8080 {
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Access-Control-Allow-Credentials "true"
+    }
+    
+    handle /api/* {
+        reverse_proxy 127.0.0.1:5058
+        
+        @options {
+            method OPTIONS
+        }
+        respond @options 200
+    }
+    
+    handle /assets/* {
+        root * ./src/WebApp/dist
+        file_server
+        header Cache-Control "public, max-age=31536000, immutable"
+    }
+    
+    handle {
+        root * ./src/WebApp/dist
+        try_files {path} /index.html
+        file_server
+    }
+}

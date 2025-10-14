@@ -10,7 +10,7 @@ namespace SimpleGateway.Plugins
         public string Name => "Text Processing Plugin";
         public string Version => "1.0.0";
         public string Description => "Erweitert Nachrichten mit Markdown-Unterstützung und Emoji-Verarbeitung";
-        public string Author => "LM Gateway Team";
+        public string Author => "AIGS Team";
         public bool IsEnabled { get; set; } = true;
 
         public async Task InitializeAsync()
@@ -107,7 +107,7 @@ namespace SimpleGateway.Plugins
         public string Name => "Analytics Plugin";
         public string Version => "1.0.0";
         public string Description => "Sammelt und analysiert Nutzungsdaten";
-        public string Author => "LM Gateway Team";
+        public string Author => "AIGS Team";
         public bool IsEnabled { get; set; } = true;
 
         private readonly Dictionary<string, int> _eventCounts = new();
@@ -174,7 +174,7 @@ namespace SimpleGateway.Plugins
         public string Name => "Local Storage Plugin";
         public string Version => "1.0.0";
         public string Description => "Speichert Dateien lokal auf dem Server";
-        public string Author => "LM Gateway Team";
+        public string Author => "AIGS Team";
         public bool IsEnabled { get; set; } = true;
 
         private readonly string _storageDirectory;

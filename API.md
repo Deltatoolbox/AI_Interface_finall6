@@ -1,8 +1,8 @@
-# LM Gateway API Documentation
+# AIGS API Documentation
 
 ## Overview
 
-The LM Gateway provides a RESTful API for interacting with LM Studio's OpenAI-compatible interface. All API endpoints require authentication except for login and health checks.
+The AIGS provides a RESTful API for interacting with LM Studio's OpenAI-compatible interface. All API endpoints require authentication except for login and health checks.
 
 ## Authentication
 

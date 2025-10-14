@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# LM Gateway Stop Script
+# AIGS Stop Script
 # Stoppt alle laufenden Services
 
-echo "🛑 Stopping LM Gateway Services..."
+echo "🛑 Stopping AIGS Services..."
 
 # Alle dotnet Prozesse stoppen
 pkill -f "dotnet.*SimpleGateway" 2>/dev/null

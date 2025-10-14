@@ -33,7 +33,7 @@ export default function ModelManagementPage() {
 
   const loadModels = async () => {
     try {
-      const response = await fetch('http://localhost:5058/api/models', {
+      const response = await fetch('/api/models', {
         credentials: 'include'
       })
       if (response.ok) {
@@ -57,7 +57,7 @@ export default function ModelManagementPage() {
 
   const loadModelStatus = async () => {
     try {
-      const response = await fetch('http://localhost:5058/api/models/status', {
+      const response = await fetch('/api/models/status', {
         credentials: 'include'
       })
       if (response.ok) {
@@ -91,7 +91,7 @@ export default function ModelManagementPage() {
     
     setIsSaving(true)
     try {
-      const response = await fetch('http://localhost:5058/api/admin/models/set-default', {
+      const response = await fetch('/api/admin/models/set-default', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# LM Gateway Start Script
+# AIGS Start Script
 # Startet Backend und Frontend gleichzeitig
 
-echo "🚀 Starting LM Gateway Services..."
+echo "🚀 Starting AIGS Services..."
 echo ""
 
 # Funktion zum Beenden aller Prozesse
@@ -18,9 +18,9 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Backend starten
-echo "📡 Starting Backend (API) on http://localhost:5058..."
+echo "📡 Starting Backend (API) on http://0.0.0.0:5058..."
 cd src/SimpleGateway
-dotnet run &
+dotnet run --urls="http://0.0.0.0:5058" &
 BACKEND_PID=$!
 
 # Kurz warten bis Backend gestartet ist
@@ -35,7 +35,7 @@ FRONTEND_PID=$!
 echo ""
 echo "✅ Services started successfully!"
 echo ""
-echo "📡 Backend API:  http://localhost:5058"
+echo "📡 Backend API:  http://0.0.0.0:5058"
 echo "🌐 Frontend Web: http://localhost:5173"
 echo ""
 echo "🔑 Login: admin / admin"

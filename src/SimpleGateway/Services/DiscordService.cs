@@ -54,7 +54,7 @@ public class DiscordService : IDiscordService
                 // Test webhook
                 var testPayload = new
                 {
-                    content = "Test message from LM Gateway"
+                    content = "Test message from AIGS"
                 };
                 
                 var json = JsonSerializer.Serialize(testPayload);

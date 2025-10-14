@@ -59,7 +59,7 @@ export default function ChatPage() {
 
   const loadConversations = async () => {
     try {
-      const response = await fetch('http://localhost:5058/api/conversations', {
+      const response = await fetch('/api/conversations', {
         credentials: 'include'
       })
       if (response.ok) {
@@ -77,7 +77,7 @@ export default function ChatPage() {
 
   const loadMessages = async (conversationId: string) => {
     try {
-      const response = await fetch(`http://localhost:5058/api/conversations/${conversationId}`, {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
         credentials: 'include'
       })
       if (response.ok) {
@@ -95,7 +95,7 @@ export default function ChatPage() {
   const createConversation = async (title: string, model?: string, category?: string) => {
     try {
       console.log('Creating conversation with title:', title, 'model:', model, 'category:', category)
-      const response = await fetch('http://localhost:5058/api/conversations', {
+      const response = await fetch('/api/conversations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,7 +162,7 @@ export default function ChatPage() {
         content = content ? `${content}\n\n${fileInfo}` : fileInfo
       }
 
-      const response = await fetch('http://localhost:5058/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -305,7 +305,7 @@ export default function ChatPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <MessageSquare className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">LM Gateway</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">AIGS</h1>
           </div>
           
           <div className="flex items-center space-x-4">
