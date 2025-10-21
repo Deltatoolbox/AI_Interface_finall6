@@ -61,11 +61,51 @@ export function ShareModal({ isOpen, onClose, conversationId, conversationTitle,
     if (!createdShare) return
 
     try {
-      await navigator.clipboard.writeText(createdShare.shareUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(createdShare.shareUrl)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        // Fallback for older browsers or HTTP contexts
+        const textArea = document.createElement('textarea')
+        textArea.value = createdShare.shareUrl
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        try {
+          document.execCommand('copy')
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } catch (err) {
+          console.error('Fallback copy failed:', err)
+        } finally {
+          document.body.removeChild(textArea)
+        }
+      }
     } catch (err) {
       console.error('Failed to copy link:', err)
+      // Try fallback even if clipboard API throws
+      const textArea = document.createElement('textarea')
+      textArea.value = createdShare.shareUrl
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      try {
+        document.execCommand('copy')
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } finally {
+        document.body.removeChild(textArea)
+      }
     }
   }
 

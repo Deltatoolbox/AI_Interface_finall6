@@ -243,14 +243,31 @@ export const api = {
   },
 
   async getSharedConversation(shareId: string, password?: string) {
-    const url = new URL(`${API_BASE_URL}/api/shares/${shareId}`)
-    if (password) url.searchParams.set('password', password)
+    let url: string
+    if (password) {
+      const urlObj = new URL(`${API_BASE_URL}/api/shares/${shareId}`, window.location.origin)
+      urlObj.searchParams.set('password', password)
+      url = urlObj.toString()
+    } else {
+      url = `${API_BASE_URL}/api/shares/${shareId}`
+    }
     
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'GET',
       credentials: 'include',
     })
-    if (!response.ok) throw new Error('Failed to get shared conversation')
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({ error: 'Unauthorized' }))
+        throw new Error(errorData.error || 'Password required')
+      }
+      if (response.status === 404) {
+        throw new Error('Share not found or expired')
+      }
+      throw new Error('Failed to get shared conversation')
+    }
+    
     return response.json()
   },
 

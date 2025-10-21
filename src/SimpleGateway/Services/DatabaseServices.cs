@@ -38,10 +38,10 @@ public interface IConversationService
 
 public interface IShareService
 {
-    Task<ShareResponse> CreateShareAsync(string userId, string conversationId, string? password = null, DateTime? expiresAt = null);
+    Task<Share> CreateShareAsync(string userId, string conversationId, string? password = null, DateTime? expiresAt = null);
     Task<SharedConversationResponse?> GetSharedConversationAsync(string shareId, string? password = null);
     Task<bool> RevokeShareAsync(string userId, string shareId);
-    Task<ShareResponse[]> GetUserSharesAsync(string userId);
+    Task<Share[]> GetUserSharesAsync(string userId);
 }
 
 public interface IChatTemplateService
@@ -648,7 +648,7 @@ public class ShareService : IShareService
         _conversationService = conversationService;
     }
 
-    public async Task<ShareResponse> CreateShareAsync(string userId, string conversationId, string? password = null, DateTime? expiresAt = null)
+    public async Task<Share> CreateShareAsync(string userId, string conversationId, string? password = null, DateTime? expiresAt = null)
     {
         // Verify user owns the conversation
         var conversation = await _context.Conversations
@@ -669,15 +669,7 @@ public class ShareService : IShareService
         _context.Shares.Add(share);
         await _context.SaveChangesAsync();
 
-        var shareUrl = $"http://localhost:5173/shared/{share.Id}";
-        
-        return new ShareResponse(
-            share.Id,
-            shareUrl,
-            share.CreatedAt,
-            share.ExpiresAt,
-            !string.IsNullOrEmpty(share.PasswordHash)
-        );
+        return share;
     }
 
     public async Task<SharedConversationResponse?> GetSharedConversationAsync(string shareId, string? password = null)
@@ -697,8 +689,11 @@ public class ShareService : IShareService
         // Check password if required
         if (!string.IsNullOrEmpty(share.PasswordHash))
         {
-            if (string.IsNullOrEmpty(password) || !BCrypt.Net.BCrypt.Verify(password, share.PasswordHash))
-                return null;
+            if (string.IsNullOrEmpty(password))
+                throw new UnauthorizedAccessException("Password required");
+            
+            if (!BCrypt.Net.BCrypt.Verify(password, share.PasswordHash))
+                throw new UnauthorizedAccessException("Invalid password");
         }
 
         // Get conversation with messages
@@ -730,20 +725,14 @@ public class ShareService : IShareService
         return true;
     }
 
-    public async Task<ShareResponse[]> GetUserSharesAsync(string userId)
+    public async Task<Share[]> GetUserSharesAsync(string userId)
     {
         var shares = await _context.Shares
             .Where(s => s.SharedByUserId == userId && s.IsActive)
             .OrderByDescending(s => s.CreatedAt)
             .ToArrayAsync();
 
-        return shares.Select(s => new ShareResponse(
-            s.Id,
-            $"http://localhost:5173/shared/{s.Id}",
-            s.CreatedAt,
-            s.ExpiresAt,
-            !string.IsNullOrEmpty(s.PasswordHash)
-        )).ToArray();
+        return shares;
     }
 }
 

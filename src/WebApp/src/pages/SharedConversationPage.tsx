@@ -63,8 +63,12 @@ export default function SharedConversationPage() {
       setNeedsPassword(false)
     } catch (err) {
       if (err instanceof Error) {
-        if (err.message.includes('password') || err.message.includes('unauthorized')) {
+        const errorMessage = err.message.toLowerCase()
+        if (errorMessage.includes('password') || errorMessage.includes('unauthorized')) {
           setNeedsPassword(true)
+          if (providedPassword) {
+            setError('Invalid password. Please try again.')
+          }
         } else {
           setError(err.message)
         }
@@ -83,11 +87,49 @@ export default function SharedConversationPage() {
 
   const copyShareLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(window.location.href)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        // Fallback for older browsers or HTTP contexts
+        const textArea = document.createElement('textarea')
+        textArea.value = window.location.href
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        try {
+          document.execCommand('copy')
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } finally {
+          document.body.removeChild(textArea)
+        }
+      }
     } catch (err) {
       console.error('Failed to copy link:', err)
+      // Try fallback even if clipboard API throws
+      const textArea = document.createElement('textarea')
+      textArea.value = window.location.href
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      try {
+        document.execCommand('copy')
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } finally {
+        document.body.removeChild(textArea)
+      }
     }
   }
 

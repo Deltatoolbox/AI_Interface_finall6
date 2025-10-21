@@ -900,7 +900,21 @@ app.MapPost("/api/shares", async (CreateShareRequest request, HttpContext contex
     try
     {
         var share = await shareService.CreateShareAsync(user.Id, request.ConversationId, request.Password, request.ExpiresAt);
-        return Results.Ok(share);
+        
+        // Generate share URL dynamically from current request
+        var scheme = context.Request.Scheme;
+        var host = context.Request.Host.Value;
+        var shareUrl = $"{scheme}://{host}/shared/{share.Id}";
+        
+        var response = new ShareResponse(
+            share.Id,
+            shareUrl,
+            share.CreatedAt,
+            share.ExpiresAt,
+            !string.IsNullOrEmpty(share.PasswordHash)
+        );
+        
+        return Results.Ok(response);
     }
     catch (UnauthorizedAccessException)
     {
@@ -922,6 +936,11 @@ app.MapGet("/api/shares/{shareId}", async (string shareId, string? password, ISh
             return Results.NotFound("Share not found or expired");
 
         return Results.Ok(conversation);
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        Console.WriteLine($"Unauthorized access to shared conversation: {ex.Message}");
+        return Results.Json(new { error = ex.Message }, statusCode: 401);
     }
     catch (Exception ex)
     {
@@ -960,7 +979,20 @@ app.MapGet("/api/shares", async (HttpContext context, IUserService userService, 
     try
     {
         var shares = await shareService.GetUserSharesAsync(user.Id);
-        return Results.Ok(shares);
+        
+        // Generate share URLs dynamically from current request
+        var scheme = context.Request.Scheme;
+        var host = context.Request.Host.Value;
+        
+        var response = shares.Select(s => new ShareResponse(
+            s.Id,
+            $"{scheme}://{host}/shared/{s.Id}",
+            s.CreatedAt,
+            s.ExpiresAt,
+            !string.IsNullOrEmpty(s.PasswordHash)
+        )).ToArray();
+        
+        return Results.Ok(response);
     }
     catch (Exception ex)
     {
