@@ -1,7 +1,8 @@
 #!/bin/bash
 # Einfacher Nginx-freier Deployment für 0.0.0.0
 # Nutzt eine einfache Caddy-Konfiguration ohne SSL
-
+echo "starting LM studio, MODEL NEED TO BE SELECTED MANUALLY"
+gnome-terminal -- bash -c "lmstudio; exec bash"
 echo "🚀 Starting AIGS on 0.0.0.0:8080 (HTTP)"
 
 # Logs-Verzeichnis erstellen
