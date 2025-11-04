@@ -1,188 +1,222 @@
-# AIGS - Local Development
+# AIGS – AI Gateway Suite
 
-This repository contains a complete AIGS with React frontend, ASP.NET Core backend, and Caddy reverse proxy for local development.
+Ein vollständiges, lokal lauffähiges AI-Gateway mit React-Frontend, ASP.NET Core Backend und Caddy/Nginx als Reverse Proxy. Unterstützt LM Studio (OpenAI-kompatibel), Konversationen, Auth, Metriken, Backups und mehr.
 
-## Features
+## Inhalt
+- Überblick und Architektur
+- Voraussetzungen
+- Schnellstart (2 Wege)
+- Konfiguration und Umgebungsvariablen
+- Entwicklung (Frontend/Backend/Migrationen/Tests)
+- Datenbank & Backups
+- Deployment (Caddy, Nginx, systemd)
+- API-Dokumentation
+- Monitoring & Security
+- Fehlerbehebung (Troubleshooting/FAQ)
 
-- **Frontend**: React with TypeScript, modern UI components
-- **Backend**: ASP.NET Core Minimal APIs with SQLite database
-- **Reverse Proxy**: Caddy for HTTPS termination and routing
-- **Authentication**: JWT-based authentication with role-based access control
-- **End-to-End Encryption**: AES-256-GCM encryption for chat messages
-- **Webhooks**: Event-driven notifications to external systems
-- **Integrations**: Slack and Discord integration
-- **Admin Panel**: Complete administration interface
-- **Backup System**: Automated backup and restore functionality
+## Überblick
+- Frontend: React + TypeScript (Vite, Tailwind) unter `src/WebApp`
+- Backend: ASP.NET Core (.NET 8)
+  - Voller Schichtenaufbau: `Gateway.Api`, `Gateway.Application`, `Gateway.Domain`, `Gateway.Infrastructure`
+  - Alternative „All-in-One“: `SimpleGateway` (SQLite, integrierte Migrations und Admin-Flows)
+- Reverse Proxy: Caddy oder Nginx
+- Datenbank: SQLite (lokal) mit Migrations (EF Core)
 
-## Prerequisites
+### Projektstruktur
+```text
+src/
+├─ Gateway.Api/             # Minimal APIs, Composition Root
+├─ Gateway.Application/     # Use-Cases, DTOs, Services, Validatoren
+├─ Gateway.Domain/          # Entities, Interfaces
+├─ Gateway.Infrastructure/  # EF Core, Repositories, externe Services
+├─ SimpleGateway/           # Alternative monolithische Variante
+└─ WebApp/                  # React-Frontend
 
-- **.NET 8 SDK**: [Download here](https://dotnet.microsoft.com/download)
-- **Node.js 18+**: [Download here](https://nodejs.org/)
-- **Caddy**: Will be installed automatically by the setup script
+tests/
+├─ Gateway.UnitTests/
+└─ Gateway.IntegrationTests/
 
-## Quick Start
-
-1. **Clone the repository:**
-   ```bash
-   git clone <your-repo-url>
-   cd AI_Interface
-   ```
-
-2. **Run the setup script:**
-   ```bash
-   ./setup-local.sh
-   ```
-
-3. **Access your application:**
-   - Frontend: http://localhost
-   - Backend API: http://localhost:5058
-   - API via Caddy: http://localhost/api
-
-4. **Stop services:**
-   ```bash
-   ./stop-local.sh
-   ```
-
-## Manual Setup (Alternative)
-
-If you prefer to set up manually:
-
-1. **Install Caddy:**
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-   sudo apt-get update
-   sudo apt-get install -y caddy
-   ```
-
-2. **Build and start backend:**
-   ```bash
-   cd src/SimpleGateway
-   dotnet run --urls="http://localhost:5058"
-   ```
-
-3. **Build frontend:**
-   ```bash
-   cd src/WebApp
-   npm install
-   npm run build
-   cp -r dist/* ../../dist/
-   ```
-
-4. **Start Caddy:**
-   ```bash
-   caddy run --config Caddyfile
-   ```
-
-## Configuration
-
-### Caddy Configuration
-
-The `Caddyfile` is configured for localhost development with:
-- HTTP on port 80
-- HTTPS on port 443 (optional, with self-signed certificates)
-- Reverse proxy to backend on port 5058
-- Static file serving for frontend
-- Security headers and CORS configuration
-
-### Backend Configuration
-
-The backend runs on port 5058 and includes:
-- SQLite database (automatically created)
-- JWT authentication
-- Role-based access control
-- Webhook system
-- Encryption services
-
-### Frontend Configuration
-
-The React frontend is built and served as static files through Caddy.
-
-## Default Login
-
-- **Username**: admin
-- **Password**: admin
-
-## API Endpoints
-
-- **Authentication**: `/api/auth/*`
-- **Users**: `/api/users/*`
-- **Conversations**: `/api/conversations/*`
-- **Chat**: `/api/chat`
-- **Admin**: `/api/admin/*`
-- **Webhooks**: `/api/webhooks/*`
-- **Integrations**: `/api/integrations/*`
-- **Health**: `/api/health`
-
-## Development
-
-### Backend Development
-
-```bash
-cd src/SimpleGateway
-dotnet watch run --urls="http://localhost:5058"
+deploy/
+├─ caddy/
+├─ nginx/
+└─ systemd/
 ```
 
-### Frontend Development
+## Voraussetzungen
+- .NET 8 SDK: `https://dotnet.microsoft.com/download`
+- Node.js 18+: `https://nodejs.org/`
+- LM Studio lokal: Standard `http://127.0.0.1:1234`
+- Caddy (optional; wird per Skript installiert) oder Nginx
 
+## Schnellstart
+
+### Weg A: Einfache Variante (Caddy + SimpleGateway)
+1) Repository klonen
+```bash
+git clone <your-repo-url>
+cd AI_Interface
+```
+2) Setup-Skript ausführen (installiert/konfiguriert Caddy, erstellt Ordner etc.)
+```bash
+./setup-local.sh
+```
+3) Starten
+```bash
+./start-simple.sh
+```
+4) Aufrufen
+- Frontend: `http://localhost`
+- API via Proxy: `http://localhost/api`
+
+Stoppen:
+```bash
+./stop-simple.sh
+```
+
+### Weg B: Voller Schichtenaufbau (Gateway.Api + WebApp)
+Backend starten:
+```bash
+dotnet run --project src/Gateway.Api
+```
+Frontend im Dev-Modus:
 ```bash
 cd src/WebApp
+npm install
+npm run dev
+```
+Standard-URLs:
+- Frontend Dev: `http://localhost:5173`
+- API: `http://localhost:5000` (laut DEVELOPMENT.md)
+
+Hinweis: Für einen gebündelten Betrieb mit Reverse Proxy siehe Abschnitt „Deployment“.
+
+## Konfiguration und Umgebungsvariablen
+- AppSettings: `src/Gateway.Api/appsettings*.json`, `src/SimpleGateway/appsettings*.json`
+- Deployment-Variablen: `deploy/aigs.env`
+- Caddy-Konfiguration: `Caddyfile`, `deploy/caddy/Caddyfile`
+- Nginx (Alternative): `deploy/nginx/nginx.conf`
+
+Wichtige Parameter (Beispiele – passen Sie diese an):
+- LM Studio Base URL: `http://127.0.0.1:1234`
+- JWT Key/Secrets: in AppSettings oder als Umgebungsvariable
+- Datenbankpfad (SQLite): in der jeweiligen `appsettings.json`
+
+## Entwicklung
+
+### Backend (Gateway.Api)
+```bash
+dotnet restore
+dotnet run --project src/Gateway.Api
+```
+Health/Metrics (laut Docs):
+- Health: `http://localhost:5000/health/live` und `/health/ready`
+- Metrics: `http://localhost:5000/metrics`
+
+### Frontend (WebApp)
+```bash
+cd src/WebApp
+npm install
 npm run dev
 ```
 
-### Database Migrations
+### Datenbank-Migrationen (Voll-Stack Variante)
+```bash
+# Migration erstellen
+dotnet ef migrations add <Name> \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
 
+# Migration anwenden
+dotnet ef database update \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+```
+
+### Datenbank-Migrationen (SimpleGateway)
 ```bash
 cd src/SimpleGateway
-dotnet ef migrations add <MigrationName>
+dotnet ef migrations add <Name>
 dotnet ef database update
 ```
 
-## Troubleshooting
+### Tests
+```bash
+dotnet test
 
-### Port Conflicts
+# nur Unit Tests
+dotnet test tests/Gateway.UnitTests
 
-If ports 80 or 5058 are in use:
-- Change the backend port in `src/SimpleGateway/Properties/launchSettings.json`
-- Update the Caddyfile to proxy to the new port
-- Or stop conflicting services
+# nur Integrationstests
+dotnet test tests/Gateway.IntegrationTests
+```
 
-### Caddy Issues
+### Standard-Login
+- Benutzer: `admin`
+- Passwort: `admin`
 
-- Test configuration: `caddy validate --config Caddyfile`
-- Check logs: `caddy run --config Caddyfile --watch`
-- Reload configuration: `caddy reload --config Caddyfile`
+## Datenbank & Backups
+- SQLite-Dateien befinden sich in `src/SimpleGateway` bzw. im Ausgabeordner des Backends
+- SimpleGateway enthält Backup/Restore-Logik und legt Snapshots in `src/SimpleGateway/backups/` ab
+- Für manuelle Backups: Kopie der `.db`-Datei im ausgeschalteten Zustand erstellen
 
-### Backend Issues
+## Deployment
 
-- Check if .NET 8 SDK is installed: `dotnet --version`
-- Restore packages: `dotnet restore`
-- Check database: The SQLite file is created automatically
+### Caddy (empfohlen für lokal)
+Start (lokal):
+```bash
+caddy run --config Caddyfile
+```
+Eigenschaften:
+- Statisches Frontend-Hosting
+- Reverse Proxy auf Backend (`/api` → Backend-Port)
+- Sicherheits-Header/CORS konfigurierbar
 
-### Frontend Issues
+### Nginx (Alternative)
+Beispiel-Konfiguration unter `deploy/nginx/nginx.conf`. Passen Sie Servername/Upstreams an.
 
-- Check Node.js version: `node --version`
-- Clear cache: `npm cache clean --force`
-- Reinstall dependencies: `rm -rf node_modules && npm install`
+### Systemd (Linux)
+Eine Service-Definition ist unter `deploy/systemd/aigs.service` enthalten. Installation siehe `deploy/install.sh`.
 
-## Security Notes
+## API-Dokumentation
+Ausführliche API-Referenz in `docs/API.md` (Auth, Modelle, Chat, Konversationen, Health, Metrics, Rate Limits, WebSocket, CORS). Nutzen Sie die Proxy-Route `/api` (z. B. `POST /api/chat`).
 
-- This setup is for **local development only**
-- Default admin credentials should be changed in production
-- HTTPS is optional for localhost development
-- Database is SQLite (file-based, not suitable for production)
+## Monitoring & Security
+- Monitoring/Observability: siehe `docs/MONITORING.md` (Prometheus, Grafana, OpenTelemetry, Logs, Tracing, Alerting)
+- Security-Guidelines: siehe `docs/SECURITY.md` (JWT, Passwörter, CORS, Reverse Proxy, Hardening, Compliance)
 
-## Production Deployment
+## Fehlerbehebung (Troubleshooting)
+Port-Konflikte:
+- Passen Sie Ports in `Caddyfile` bzw. `launchSettings.json`/`appsettings.json` an
+- Stoppen Sie kollidierende Dienste
 
-For production deployment, consider:
-- Using a real domain with Let's Encrypt certificates
-- PostgreSQL or SQL Server instead of SQLite
-- Proper secrets management
-- Environment-specific configurations
-- Load balancing and scaling
+Caddy-Probleme:
+```bash
+caddy validate --config Caddyfile
+caddy run --config Caddyfile --watch
+caddy reload --config Caddyfile
+```
 
-## License
+Backend:
+- `.NET 8` installiert? `dotnet --version`
+- Pakete erneuern: `dotnet restore`
+- Datenbank vorhanden/Berechtigungen prüfen (SQLite-Datei)
 
-[Your License Here]
+Frontend:
+```bash
+node --version
+npm cache clean --force
+rm -rf node_modules && npm install
+```
+
+LM Studio:
+- Läuft auf `http://127.0.0.1:1234`?
+- Modelle geladen?
+- BaseUrl in `appsettings.json` korrekt?
+
+## FAQ
+- Kann ich ohne Caddy entwickeln? Ja. Starten Sie `Gateway.Api` und `WebApp` im Dev-Modus (Ports 5000/5173). Passen Sie CORS an.
+- Production-DB? Nutzen Sie Postgres/SQL Server. SQLite ist für lokal/Tests.
+- SSL lokal? Caddy kann selbstsignierte Zertifikate ausliefern. Für Prod echte Zertifikate (Let’s Encrypt).
+
+## Lizenz
+[Ihre Lizenz hier]
