@@ -73,6 +73,16 @@ Stoppen:
 ./stop-simple.sh
 ```
 
+Status prüfen:
+```bash
+./status-simple.sh
+```
+
+Logs ansehen (laufen im Hintergrunddienst):
+```bash
+tail -f logs/simplegateway.log
+```
+
 ### Weg B: Voller Schichtenaufbau (Gateway.Api + WebApp)
 Backend starten:
 ```bash

@@ -834,9 +834,11 @@ public class ChatTemplateService : IChatTemplateService
 
     public async Task SeedBuiltInTemplatesAsync()
     {
-        // Check if templates already exist
-        if (await _context.ChatTemplates.AnyAsync())
-            return;
+        // Get existing template IDs to avoid duplicates
+        var existingTemplateIds = await _context.ChatTemplates
+            .Where(t => t.IsBuiltIn)
+            .Select(t => t.Id)
+            .ToListAsync();
 
         var builtInTemplates = new[]
         {
@@ -844,56 +846,192 @@ public class ChatTemplateService : IChatTemplateService
             {
                 Id = "general-assistant",
                 Name = "General Assistant",
-                Description = "A helpful AI assistant for general questions and tasks",
+                Description = "A helpful AI assistant for general questions and tasks. Perfect for everyday conversations and general inquiries.",
                 Category = "General",
-                SystemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.",
-                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Hello! How can I help you today?", "What would you like to know?" }),
-                IsBuiltIn = true
+                SystemPrompt = "You are a helpful, friendly, and knowledgeable AI assistant. Provide clear, accurate, and helpful responses to user questions. Be concise but thorough, and always strive to be helpful and respectful.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Hello! How can I help you today?", 
+                    "What would you like to know?",
+                    "Can you explain how this works?",
+                    "Help me understand this concept"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             },
             new ChatTemplate
             {
                 Id = "creative-writer",
                 Name = "Creative Writer",
-                Description = "Specialized in creative writing, storytelling, and content creation",
+                Description = "Specialized in creative writing, storytelling, and content creation. Helps with narratives, characters, and creative brainstorming.",
                 Category = "Creative",
-                SystemPrompt = "You are a creative writing assistant. Help users with storytelling, creative writing, brainstorming ideas, and developing characters and plots.",
-                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Help me write a short story about...", "Create a character profile for..." }),
-                IsBuiltIn = true
+                SystemPrompt = "You are a creative writing assistant with expertise in storytelling, character development, and narrative structure. Help users with storytelling, creative writing, brainstorming ideas, developing characters and plots, writing dialogue, and improving their creative writing skills. Be imaginative and supportive.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Help me write a short story about a time traveler",
+                    "Create a character profile for a detective",
+                    "Brainstorm plot ideas for a fantasy novel",
+                    "Help me write engaging dialogue"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             },
             new ChatTemplate
             {
                 Id = "code-assistant",
                 Name = "Code Assistant",
-                Description = "Programming and software development helper",
+                Description = "Programming and software development helper. Assists with coding, debugging, and explaining programming concepts.",
                 Category = "Programming",
-                SystemPrompt = "You are a programming assistant. Help with code writing, debugging, explaining programming concepts, and best practices.",
-                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Help me write a function that...", "Explain this code:", "What's wrong with this code?" }),
-                IsBuiltIn = true
+                SystemPrompt = "You are an expert programming assistant with deep knowledge of multiple programming languages and software development practices. Help with code writing, debugging, explaining programming concepts, best practices, code optimization, and architecture design. Always provide clear, well-commented code examples and explain your reasoning.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Help me write a function that sorts an array",
+                    "Explain this code: [code snippet]",
+                    "What's wrong with this code? [code snippet]",
+                    "How can I optimize this algorithm?",
+                    "What's the best practice for handling errors in this scenario?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             },
             new ChatTemplate
             {
                 Id = "language-tutor",
                 Name = "Language Tutor",
-                Description = "Language learning and practice assistant",
+                Description = "Language learning and practice assistant. Helps with grammar, vocabulary, translations, and language practice.",
                 Category = "Education",
-                SystemPrompt = "You are a language learning tutor. Help users practice languages, explain grammar, provide translations, and offer learning tips.",
-                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Help me practice Spanish", "Explain the difference between...", "Translate this text:" }),
-                IsBuiltIn = true
+                SystemPrompt = "You are a patient and encouraging language learning tutor. Help users practice languages, explain grammar rules, provide translations, offer learning tips, correct mistakes, and create practice exercises. Adapt your teaching style to the user's level and learning goals.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Help me practice Spanish conversation",
+                    "Explain the difference between 'ser' and 'estar'",
+                    "Translate this text: [text]",
+                    "Can you create a vocabulary quiz for me?",
+                    "What's the grammar rule for this sentence?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             },
             new ChatTemplate
             {
                 Id = "business-analyst",
                 Name = "Business Analyst",
-                Description = "Business strategy, analysis, and planning assistant",
+                Description = "Business strategy, analysis, and planning assistant. Helps with market analysis, business plans, and strategic decisions.",
                 Category = "Business",
-                SystemPrompt = "You are a business analyst assistant. Help with market analysis, business strategy, financial planning, and organizational development.",
-                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { "Analyze this business case:", "Help me create a business plan", "What are the risks of..." }),
-                IsBuiltIn = true
+                SystemPrompt = "You are a business analyst assistant with expertise in market analysis, business strategy, financial planning, and organizational development. Help users analyze business cases, create business plans, evaluate risks and opportunities, and make data-driven decisions. Provide structured, professional analysis.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Analyze this business case: [case description]",
+                    "Help me create a business plan for a startup",
+                    "What are the risks and opportunities of this market?",
+                    "How can I improve my business strategy?",
+                    "Help me analyze competitor data"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new ChatTemplate
+            {
+                Id = "technical-support",
+                Name = "Technical Support",
+                Description = "Technical support specialist for troubleshooting and solving technical problems. Helps with software, hardware, and system issues.",
+                Category = "Technical",
+                SystemPrompt = "You are a technical support specialist with expertise in troubleshooting software, hardware, and system issues. Help users diagnose problems, provide step-by-step solutions, explain technical concepts in simple terms, and guide them through troubleshooting processes. Be patient, clear, and methodical.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "I'm having trouble connecting to the internet, can you help?",
+                    "My computer is running slowly, what should I check?",
+                    "How do I troubleshoot this error: [error message]",
+                    "Can you guide me through installing this software?",
+                    "What does this technical error mean?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new ChatTemplate
+            {
+                Id = "research-assistant",
+                Name = "Research Assistant",
+                Description = "Research and information gathering assistant. Helps with research, fact-checking, and organizing information.",
+                Category = "Research",
+                SystemPrompt = "You are a research assistant that helps users gather, analyze, and organize information. Assist with research tasks, fact-checking, summarizing sources, creating research outlines, and synthesizing information from multiple sources. Always cite sources when possible and distinguish between facts and opinions.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Help me research the history of artificial intelligence",
+                    "What are the latest developments in renewable energy?",
+                    "Can you summarize these research papers?",
+                    "Help me create a research outline for my thesis",
+                    "What are the key facts about this topic?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new ChatTemplate
+            {
+                Id = "code-reviewer",
+                Name = "Code Reviewer",
+                Description = "Code review and quality assurance assistant. Reviews code for bugs, best practices, and improvements.",
+                Category = "Programming",
+                SystemPrompt = "You are an expert code reviewer focused on code quality, security, performance, and best practices. Review code for bugs, security vulnerabilities, performance issues, code smells, and adherence to best practices. Provide constructive feedback, suggest improvements, and explain why certain patterns are better than others. Be thorough but respectful.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Review this code for bugs and improvements: [code]",
+                    "What security issues do you see in this code?",
+                    "How can I improve the performance of this function?",
+                    "Does this code follow best practices?",
+                    "What are potential issues with this implementation?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new ChatTemplate
+            {
+                Id = "data-analyst",
+                Name = "Data Analyst",
+                Description = "Data analysis and statistics assistant. Helps with data interpretation, statistical analysis, and data visualization.",
+                Category = "Analytics",
+                SystemPrompt = "You are a data analyst assistant with expertise in statistics, data analysis, and data interpretation. Help users analyze data, interpret statistics, create data visualizations, identify trends and patterns, and make data-driven decisions. Explain statistical concepts clearly and suggest appropriate analysis methods.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Help me analyze this dataset: [data description]",
+                    "What statistical test should I use for this analysis?",
+                    "Can you help me interpret these results?",
+                    "What trends do you see in this data?",
+                    "How should I visualize this data?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new ChatTemplate
+            {
+                Id = "content-editor",
+                Name = "Content Editor",
+                Description = "Text editing and improvement assistant. Helps with grammar, style, clarity, and content improvement.",
+                Category = "Writing",
+                SystemPrompt = "You are a professional content editor that helps improve written content. Assist with grammar, spelling, style, clarity, structure, tone, and overall quality. Provide suggestions for improvement while maintaining the author's voice and intent. Be constructive and explain your edits.",
+                ExampleMessages = System.Text.Json.JsonSerializer.Serialize(new[] { 
+                    "Can you edit this text for grammar and clarity?",
+                    "Improve the style and flow of this paragraph",
+                    "Help me make this text more engaging",
+                    "Check this document for errors and suggest improvements",
+                    "How can I make this writing more concise?"
+                }),
+                IsBuiltIn = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             }
         };
 
-        _context.ChatTemplates.AddRange(builtInTemplates);
-        await _context.SaveChangesAsync();
+        // Only add templates that don't already exist
+        var templatesToAdd = builtInTemplates
+            .Where(t => !existingTemplateIds.Contains(t.Id))
+            .ToList();
+
+        if (templatesToAdd.Any())
+        {
+            _context.ChatTemplates.AddRange(templatesToAdd);
+            await _context.SaveChangesAsync();
+        }
     }
 
     private ChatTemplateDto MapToDto(ChatTemplate template)

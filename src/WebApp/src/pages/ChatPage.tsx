@@ -44,6 +44,7 @@ export default function ChatPage() {
   // const [isLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  const [templatePrompt, setTemplatePrompt] = useState<string>('')
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -82,10 +83,17 @@ export default function ChatPage() {
       })
       if (response.ok) {
         const data = await response.json()
-        setMessages((data.messages || []).map((m: any) => ({
+        const loadedMessages = (data.messages || []).map((m: any) => ({
           ...m,
           timestamp: new Date(m.createdAt)
-        })))
+        }))
+        setMessages(loadedMessages)
+        
+        // Clear template prompt if loading an existing conversation (no system message)
+        const hasSystemMessage = loadedMessages.some((m: Message) => m.role === 'system')
+        if (!hasSystemMessage && templatePrompt) {
+          setTemplatePrompt('')
+        }
       }
     } catch (error) {
       console.error('Failed to load messages:', error)
@@ -135,6 +143,9 @@ export default function ChatPage() {
 
   const sendMessage = async (content: string, files?: UploadedFile[]) => {
     if (!content.trim() && !files?.length) return
+
+    // Clear template prompt after sending
+    setTemplatePrompt('')
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -279,20 +290,31 @@ export default function ChatPage() {
       
       setMessages([systemMessage])
       
-      // If there are example messages, add them as user messages
-      if (template.exampleMessages && template.exampleMessages.length > 0) {
-        const exampleMessages: Message[] = template.exampleMessages.map((msg: string, index: number) => ({
-          id: `example-${index}-${Date.now()}`,
-          role: 'user' as const,
-          content: msg,
-          timestamp: new Date(),
-          files: []
-        }))
-        
-        setMessages(prev => [...prev, ...exampleMessages])
-      }
-      
       setCurrentConversation(conversation)
+      
+      // Set the first example message as template prompt in the input field
+      // Use setTimeout to ensure this runs after the conversation is set
+      setTimeout(() => {
+        if (template.exampleMessages && template.exampleMessages.length > 0) {
+          // Use the first example message as the template prompt
+          setTemplatePrompt(template.exampleMessages[0])
+          
+          // Optionally add other example messages as user messages for reference
+          if (template.exampleMessages.length > 1) {
+            const remainingExamples: Message[] = template.exampleMessages.slice(1).map((msg: string, index: number) => ({
+              id: `example-${index + 1}-${Date.now()}`,
+              role: 'user' as const,
+              content: msg,
+              timestamp: new Date(),
+              files: []
+            }))
+            setMessages(prev => [...prev, ...remainingExamples])
+          }
+        } else {
+          // If no example messages, clear the template prompt
+          setTemplatePrompt('')
+        }
+      }, 100)
     } catch (error) {
       console.error('Failed to apply template:', error)
     }
@@ -376,6 +398,8 @@ export default function ChatPage() {
                   onSendMessage={sendMessage}
                   disabled={isStreaming}
                   onStop={stopStreaming}
+                  initialValue={templatePrompt}
+                  placeholder={templatePrompt ? undefined : "Type your message... (Enter to send, Shift+Enter for new line)"}
                 />
               </div>
             </>

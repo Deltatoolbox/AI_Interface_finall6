@@ -14,14 +14,23 @@ interface MessageInputProps {
   onSendMessage: (message: string, files?: UploadedFile[]) => void
   disabled?: boolean
   onStop?: () => void
+  initialValue?: string
+  placeholder?: string
 }
 
-export function MessageInput({ onSendMessage, disabled = false, onStop }: MessageInputProps) {
-  const [message, setMessage] = useState('')
+export function MessageInput({ onSendMessage, disabled = false, onStop, initialValue = '', placeholder }: MessageInputProps) {
+  const [message, setMessage] = useState(initialValue)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Update message when initialValue changes (e.g., when template is selected)
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setMessage(initialValue)
+    }
+  }, [initialValue])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -330,7 +339,7 @@ export function MessageInput({ onSendMessage, disabled = false, onStop }: Messag
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+            placeholder={placeholder || "Type your message... (Enter to send, Shift+Enter for new line)"}
             disabled={disabled}
             className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             rows={1}
