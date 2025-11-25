@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIGS - AI Gateway Suite Documentation</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <a href="index.html" class="logo">
+        <span>🚀</span>
+        <span>AIGS Documentation</span>
+      </a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html" class="nav-link active">Home</a>
+      <a href="overview.html" class="nav-link">Overview</a>
+      <a href="architecture.html" class="nav-link">Architecture</a>
+      <a href="api-reference.html" class="nav-link">API</a>
+      <a href="development.html" class="nav-link">Development</a>
+    </div>
+    <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+  </header>
+
+  <main>
+    <div class="container-wide">
+      <h1>AI Gateway Suite (AIGS)</h1>
+      <p class="lead" style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 3rem;">
+        Comprehensive documentation for the AI Gateway Suite - a locally runnable AI stack with React frontend, ASP.NET Core backend, and seamless LM Studio integration.
+      </p>
+
+      <!-- Quick Links -->
+      <section class="section">
+        <h2>Quick Start</h2>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-title">🎯 Getting Started</div>
+            <p class="card-description">New to AIGS? Start here for installation, setup, and your first conversation.</p>
+            <a href="overview.html" style="color: var(--primary-color); font-weight: 600;">View Overview →</a>
+          </div>
+          <div class="card">
+            <div class="card-title">🏗️ Architecture</div>
+            <p class="card-description">Understand the system design, deployment modes, and how components work together.</p>
+            <a href="architecture.html" style="color: var(--primary-color); font-weight: 600;">Explore Architecture →</a>
+          </div>
+          <div class="card">
+            <div class="card-title">📡 API Reference</div>
+            <p class="card-description">Complete API endpoint documentation with request/response examples.</p>
+            <a href="api-reference.html" style="color: var(--primary-color); font-weight: 600;">API Docs →</a>
+          </div>
+          <div class="card">
+            <div class="card-title">💻 Development</div>
+            <p class="card-description">Setup your dev environment, run tests, and contribute to the project.</p>
+            <a href="development.html" style="color: var(--primary-color); font-weight: 600;">Dev Guide →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Core Documentation -->
+      <section class="section">
+        <h2>Core Documentation</h2>
+        <div style="display: grid; gap: 1rem;">
+          <a href="overview.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Project Overview</div>
+            <p class="card-description">Learn about AIGS features, technology stack, and quick start guides for both deployment modes.</p>
+          </a>
+          
+          <a href="architecture.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Architecture & Design</div>
+            <p class="card-description">Detailed architecture diagrams, deployment shapes (Layered vs SimpleGateway), component interactions, and data flows.</p>
+          </a>
+          
+          <a href="domain-models.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Domain Models Deep Dive</div>
+            <p class="card-description">Complete source code and explanations for User, Conversation, Message, and UsageLog entities.</p>
+          </a>
+          
+          <a href="application-layer.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Application Layer</div>
+            <p class="card-description">Service architecture, DTOs, validation logic, and use case orchestration patterns.</p>
+          </a>
+          
+          <a href="infrastructure-layer.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Infrastructure Layer</div>
+            <p class="card-description">EF Core implementation, repositories, LM Studio client, and database migrations.</p>
+          </a>
+          
+          <a href="api-reference.html" class="card" style="text-decoration: none;">
+            <div class="card-title">API Reference</div>
+            <p class="card-description">All API endpoints including authentication, chat, conversations, health checks, and admin operations.</p>
+          </a>
+          
+          <a href="frontend.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Frontend (WebApp)</div>
+            <p class="card-description">React architecture, component hierarchy, state management, and integration patterns.</p>
+          </a>
+          
+          <a href="integration-flows.html" class="card" style="text-decoration: none;">
+            <div class="card-title">Integration Flows</div>
+            <p class="card-description">End-to-end sequences: authentication, chat with streaming, conversation management, file uploads.</p>
+          </a>
+        </div>
+      </section>
+
+      <!-- Operations & Development -->
+      <section class="section">
+        <h2>Operations & Development</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+          <a href="configuration.html" class="card" style="text-decoration: none;">
+            <div class="card-title">⚙️ Configuration</div>
+            <p class="card-description">Environment variables, appsettings.json, Caddy/Nginx setup, and database connections.</p>
+          </a>
+          
+          <a href="deployment.html" class="card" style="text-decoration: none;">
+            <div class="card-title">🚀 Deployment</div>
+            <p class="card-description">Local development, production deployment, systemd services, and troubleshooting.</p>
+          </a>
+          
+          <a href="development.html" class="card" style="text-decoration: none;">
+            <div class="card-title">🛠️ Development Guide</div>
+            <p class="card-description">Dev setup, testing, migrations, adding features, and code organization.</p>
+          </a>
+          
+          <a href="security.html" class="card" style="text-decoration: none;">
+            <div class="card-title">🔒 Security</div>
+            <p class="card-description">JWT authentication, password hashing, CORS, security headers, and best practices.</p>
+          </a>
+          
+          <a href="monitoring.html" class="card" style="text-decoration: none;">
+            <div class="card-title">📊 Monitoring & Operations</div>
+            <p class="card-description">Health checks, Prometheus metrics, logging, alerting, and performance monitoring.</p>
+          </a>
+        </div>
+      </section>
+
+      <!-- Features Highlight -->
+      <section class="section">
+        <h2>Key Features</h2>
+        <div class="card">
+          <ul style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; list-style: none; padding: 0;">
+            <li><strong>🎨 Modern UI</strong> - React with TypeScript, Tailwind CSS, dark mode</li>
+            <li><strong>🔐 Secure Auth</strong> - JWT-based with role-based access control</li>
+            <li><strong>💬 Real-time Chat</strong> - Streaming responses from LM Studio</li>
+            <li><strong>📝 Conversations</strong> - Organized chat threads with history</li>
+            <li><strong>🎯 Templates</strong> - Pre-built prompts for common tasks</li>
+            <li><strong>📊 Admin Dashboard</strong> - User management, statistics, auditing</li>
+            <li><strong>🔌 Extensible</strong> - Plugin system for integrations</li>
+            <li><strong>🛡️ Privacy-First</strong> - Optional message encryption, GDPR support</li>
+            <li><strong>📈 Monitoring</strong> - Health checks, metrics, audit logs</li>
+            <li><strong>🚀 Easy Deployment</strong> - Simple setup scripts, Docker ready</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Technology Stack -->
+      <section class="section">
+        <h2>Technology Stack</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Technologies</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Frontend</strong></td>
+              <td>React 18, TypeScript, Vite, Tailwind CSS</td>
+              <td>Modern, type-safe UI with hot reload</td>
+            </tr>
+            <tr>
+              <td><strong>Backend API</strong></td>
+              <td>ASP.NET Core 8, Minimal APIs</td>
+              <td>High-performance, lightweight REST API</td>
+            </tr>
+            <tr>
+              <td><strong>Application</strong></td>
+              <td>.NET 8, FluentValidation</td>
+              <td>Business logic, DTOs, validation</td>
+            </tr>
+            <tr>
+              <td><strong>Domain</strong></td>
+              <td>.NET 8</td>
+              <td>Core entities, interfaces, domain logic</td>
+            </tr>
+            <tr>
+              <td><strong>Infrastructure</strong></td>
+              <td>EF Core, SQLite, HttpClient</td>
+              <td>Data persistence, external integrations</td>
+            </tr>
+            <tr>
+              <td><strong>Proxy</strong></td>
+              <td>Caddy / Nginx</td>
+              <td>Reverse proxy, TLS, static hosting</td>
+            </tr>
+            <tr>
+              <td><strong>AI Backend</strong></td>
+              <td>LM Studio (OpenAI-compatible)</td>
+              <td>Local LLM inference</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Project Structure -->
+      <section class="section">
+        <h2>Project Structure</h2>
+        <pre><code>AI_Interface/
+├── src/
+│   ├── Gateway.Api/             # Minimal APIs, DI wiring, health/metrics
+│   ├── Gateway.Application/     # Use-cases, DTOs, validators
+│   ├── Gateway.Domain/          # Entities, value objects, interfaces
+│   ├── Gateway.Infrastructure/  # EF Core, repositories, LLM adapters
+│   ├── SimpleGateway/           # Monolith alternative (all-in-one)
+│   └── WebApp/                  # React frontend
+│
+├── tests/
+│   ├── Gateway.UnitTests/
+│   └── Gateway.IntegrationTests/
+│
+├── deploy/
+│   ├── caddy/                   # Caddy reverse proxy config
+│   ├── nginx/                   # Nginx alternative config
+│   └── systemd/                 # Linux service definitions
+│
+├── docs/                        # This documentation
+├── start-simple.sh              # Quick start script
+└── README.md                    # Project overview</code></pre>
+      </section>
+
+      <!-- License & Support -->
+      <section class="section">
+        <h2>Support & Contribution</h2>
+        <div class="alert alert-info">
+          <strong>Need help?</strong> Check the <a href="development.html#troubleshooting">troubleshooting guide</a> or review the <a href="api-reference.html">API documentation</a>.
+        </div>
+        <div class="alert alert-success" style="margin-top: 1rem;">
+          <strong>Want to contribute?</strong> See the <a href="development.html">development guide</a> for information on setup, testing, and code organization.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2024-2025 AIGS - AI Gateway Suite. Built with ❤️ for local-first AI.</p>
+  </footer>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

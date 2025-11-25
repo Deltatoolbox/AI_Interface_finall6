@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Infrastructure Layer Deep Dive</title>
+    <meta name="description"
+        content="Comprehensive guide to the AIGS Infrastructure Layer - database access, repositories, external services, and encryption">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="infrastructure-layer.html" class="nav-link active">Infrastructure Layer</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <a href="architecture.html">Architecture</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Infrastructure Layer</span>
+            </div>
+
+            <h1>Infrastructure Layer - Deep Dive</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                The Infrastructure Layer is where the application meets the outside world. It handles all interactions
+                with external systems: databases, file systems, HTTP APIs, and hardware resources. This layer translates
+                between the clean, abstract interfaces defined in the Domain Layer and the messy reality of external
+                dependencies. Think of it as the "adapter" layer that allows your business logic to remain pure and
+                focused, while all the complex integration work happens here.
+            </p>
+
+            <!-- LEVEL 1: CONCEPTUAL INTRODUCTION -->
+            <section class="section">
+                <h2>Understanding the Infrastructure Layer</h2>
+
+                <h3>What is Infrastructure in Software?</h3>
+                <p>
+                    Imagine you're building a house. The <strong>Domain Layer</strong> is like the architectural
+                    blueprint - it defines what rooms you have, how they connect, and what purpose they serve. The
+                    <strong>Application Layer</strong> is like the contractor coordinating the work - deciding what
+                    tasks happen in what order. The <strong>Infrastructure Layer</strong> is like the actual workers,
+                    tools, and materials - the concrete implementation that makes everything real.
+                </p>
+
+                <p>
+                    In software, infrastructure refers to everything that connects your application to the outside
+                    world:
+                </p>
+
+                <ul>
+                    <li><strong>Databases</strong> - Where your data actually lives on disk</li>
+                    <li><strong>External APIs</strong> - Services you call over the network (like LM Studio for AI)</li>
+                    <li><strong>File Systems</strong> - Reading and writing files</li>
+                    <li><strong>Encryption</strong> - Securing sensitive data</li>
+                    <li><strong>Email Services</strong> - Sending notifications (if implemented)</li>
+                    <li><strong>Caching</strong> - Storing frequently accessed data in memory</li>
+                </ul>
+
+                <h3>Why Separate Infrastructure from Business Logic?</h3>
+                <p>
+                    You might wonder: why not just write database code directly in your business logic? Why create this
+                    separate layer? There are several compelling reasons:
+                </p>
+
+                <div class="card">
+                    <div class="card-title">💡 Benefits of Infrastructure Separation</div>
+                    <ul>
+                        <li><strong>Testability</strong> - You can test business logic without needing a real database.
+                            Just create a "fake" repository that stores data in memory.</li>
+                        <li><strong>Flexibility</strong> - Want to switch from SQLite to PostgreSQL? Only the
+                            Infrastructure Layer changes; your business logic stays the same.</li>
+                        <li><strong>Clarity</strong> - Business logic isn't cluttered with SQL queries, HTTP calls, or
+                            file operations. Each layer has a clear purpose.</li>
+                        <li><strong>Maintainability</strong> - When database technology changes (and it will), you only
+                            need to update one well-defined layer.</li>
+                        <li><strong>Independence</strong> - Your business rules don't depend on specific databases or
+                            APIs. The domain remains pure and portable.</li>
+                    </ul>
+                </div>
+
+                <h3>Real-World Analogy</h3>
+                <p>
+                    Think of a restaurant. The chef (Application Layer) needs ingredients (data) from the refrigerator
+                    (database). The chef doesn't go directly to farms to get vegetables - there's a supply chain
+                    (Infrastructure) that handles that complexity. The chef just says "I need tomatoes" and the supply
+                    chain figures out where to get them, how to transport them, and how to store them properly. If the
+                    supplier changes, the chef's recipes (business logic) don't need to change at all.
+                </p>
+            </section>
+
+            <!-- LEVEL 2: ARCHITECTURE -->
+            <section class="section">
+                <h2>Infrastructure Layer in AIGS Architecture</h2>
+
+                <h3>Position in the Dependency Graph</h3>
+                <p>
+                    In AIGS, the Infrastructure Layer sits at the outer edge of the architecture. It depends on the
+                    Domain Layer (to know what interfaces to implement) but nothing depends on it directly. This
+                    inverted dependency is the key to the clean architecture pattern. By forcing the infrastructure to
+                    depend on the domain, we ensure that our core business rules remain stable even if we completely
+                    swap out the underlying database or external services.
+                </p>
+                <p>
+                    The diagram below illustrates this relationship. Notice how the arrows flow: everything points
+                    inwards towards the Domain, or downwards from the API to the Infrastructure (for wiring up
+                    dependencies). The Infrastructure layer is effectively a plugin to the core application.
+                </p>
+
+                <div class="mermaid">
+                    graph TB
+                    API[API Layer<br />HTTP Endpoints]
+                    App[Application Layer<br />Use Cases & Services]
+                    Domain[Domain Layer<br />Entities & Interfaces]
+                    Infra[Infrastructure Layer<br />Implementations]
+
+                    API --> App
+                    App --> Domain
+                    Infra --> Domain
+                    API -.wires up.-> Infra
+
+                    DB[(Database<br />SQLite/PostgreSQL)]
+                    LM[LM Studio<br />AI Service]
+                    Files[File System]
+
+                    Infra --> DB
+                    Infra --> LM
+                    Infra --> Files
+
+                    style Domain fill:#ff9800,color:#fff
+                    style App fill:#2196f3,color:#fff
+                    style Infra fill:#4caf50,color:#fff
+                    style API fill:#9c27b0,color:#fff
+                    style DB fill:#003b57,color:#fff
+                    style LM fill:#ff6b6b,color:#fff
+                </div>
+
+                <p>
+                    Notice the arrows: the Infrastructure Layer points TO the Domain Layer, not the other way around.
+                    This means Domain entities and interfaces have zero knowledge of databases, ORMs, or external APIs.
+                    They just define abstract interfaces like <code>IUserRepository</code>, and the Infrastructure Layer
+                    provides concrete implementations like <code>UserRepository</code>. This separation allows us to
+                    develop and test the core domain logic in isolation, mocking out the infrastructure entirely.
+                </p>
+
+                <h3>Key Components in AIGS Infrastructure</h3>
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-title">📊 Database Access</div>
+                        <p class="card-description">Entity Framework Core DbContext, migrations, and database
+                            configuration for SQLite (dev) and PostgreSQL (production)</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📦 Repositories</div>
+                        <p class="card-description">Concrete implementations of repository interfaces: UserRepository,
+                            ConversationRepository, MessageRepository, UsageLogRepository</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🤖 LM Studio Client</div>
+                        <p class="card-description">HTTP client for communicating with LM Studio's OpenAI-compatible
+                            API, handling chat completions and streaming</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔐 Encryption Service</div>
+                        <p class="card-description">AES-GCM encryption/decryption for message content, key management,
+                            and key rotation</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- LEVEL 3: DATABASE ACCESS -->
+            <section class="section">
+                <h2>Database Access with Entity Framework Core</h2>
+
+                <h3>What is an ORM (Object-Relational Mapper)?</h3>
+                <p>
+                    Databases speak SQL. C# speaks... well, C#. An ORM (Object-Relational Mapper) is the translator
+                    between these two worlds. Instead of writing raw SQL queries like:
+                </p>
+
+                <pre><code>SELECT * FROM Users WHERE Username = 'john' LIMIT 1</code></pre>
+
+                <p>You can write C# code like:</p>
+
+                <pre><code>var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == "john");</code></pre>
+
+                <p>
+                    The ORM (Entity Framework Core in our case) translates your C# LINQ query into SQL, sends it to the
+                    database, and converts the result back into C# objects. This has several advantages:
+                </p>
+
+                <ul>
+                    <li><strong>Type Safety</strong> - The compiler catches errors. Typos in column names become
+                        compile-time errors instead of runtime crashes.</li>
+                    <li><strong>Productivity</strong> - No need to manually map database rows to C# objects.</li>
+                    <li><strong>Database Independence</strong> - The same code works with SQLite, PostgreSQL, SQL
+                        Server, etc. The ORM generates the right SQL for each database.</li>
+                    <li><strong>Security</strong> - ORMs automatically use parameterized queries, preventing SQL
+                        injection attacks.</li>
+                </ul>
+
+                <h3>GatewayDbContext - The Database Gateway</h3>
+                <p>
+                    The <code>DbContext</code> is Entity Framework's main entry point. It represents a session with the
+                    database and provides <code>DbSet</code> properties for each entity type. In AIGS, the
+                    <code>GatewayDbContext</code> acts as the bridge between our C# entity classes and the underlying
+                    database tables. It handles connection management, change tracking, and transaction coordination.
+                </p>
+                <p>
+                    Below is the complete implementation. Notice how we use the <code>OnModelCreating</code> method to
+                    precisely configure the database schema using the Fluent API. This gives us full control over column
+                    types, constraints, and relationships without polluting our domain entities with database-specific
+                    attributes.
+                </p>
+                <pre><code>using Gateway.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace Gateway.Infrastructure.Data;
+
+public sealed class GatewayDbContext : DbContext
+{
+    public GatewayDbContext(DbContextOptions&lt;GatewayDbContext&gt; options) : base(options)
+    {
+    }
+
+    // DbSets represent tables in the database
+    public DbSet&lt;User&gt; Users { get; set; } = null!;
+    public DbSet&lt;Conversation&gt; Conversations { get; set; } = null!;
+    public DbSet&lt;Message&gt; Messages { get; set; } = null!;
+    public DbSet&lt;UsageLog&gt; UsageLogs { get; set; } = null!;
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // Configure User entity
+        modelBuilder.Entity&lt;User&gt;(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Username).IsUnique();
+            entity.Property(e => e.Username).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.Role).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.IsActive).IsRequired();
+            entity.Property(e => e.DailyTokenQuota).IsRequired();
+        });
+
+        // Configure Conversation entity
+        modelBuilder.Entity&lt;Conversation&gt;(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired();
+            
+            // Define relationship: One User has Many Conversations
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Conversations)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure Message entity
+        modelBuilder.Entity&lt;Message&gt;(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Role).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Content).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            
+            // Define relationship: One Conversation has Many Messages
+            entity.HasOne(e => e.Conversation)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(e => e.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure UsageLog entity
+        modelBuilder.Entity&lt;UsageLog&gt;(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Model).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            
+            // Define relationship: One User has Many UsageLogs
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.UsageLogs)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+}</code></pre>
+
+                <h3>Understanding the Configuration</h3>
+                <p>Let's break down what's happening in <code>OnModelCreating</code>:</p>
+
+                <ul>
+                    <li><strong>Primary Keys</strong> - <code>HasKey(e => e.Id)</code> tells EF Core which property is
+                        the primary key</li>
+                    <li><strong>Indexes</strong> - <code>HasIndex(e => e.Username).IsUnique()</code> creates a database
+                        index for faster lookups and enforces uniqueness</li>
+                    <li><strong>Required Fields</strong> - <code>IsRequired()</code> makes columns NOT NULL in the
+                        database</li>
+                    <li><strong>String Lengths</strong> - <code>HasMaxLength(50)</code> sets VARCHAR(50) instead of
+                        unlimited text</li>
+                    <li><strong>Relationships</strong> - <code>HasOne...WithMany...HasForeignKey</code> defines how
+                        entities relate to each other</li>
+                    <li><strong>Cascade Delete</strong> - <code>OnDelete(DeleteBehavior.Cascade)</code> means deleting a
+                        user automatically deletes their conversations and usage logs</li>
+                </ul>
+
+                <h3>Database Migration System</h3>
+                <p>
+                    When you change your entity models, how do you update the database schema? Entity Framework's
+                    migration system handles this. Migrations are version-controlled, incremental database schema
+                    changes. Each migration is a C# class that describes how to upgrade (and downgrade) the schema.
+                </p>
+
+                <div class="card">
+                    <div class="card-title">🔄 Migration Workflow</div>
+                    <ol>
+                        <li><strong>Modify Entity</strong> - Change a domain entity (e.g., add a new property)</li>
+                        <li><strong>Create Migration</strong> - Run <code>dotnet ef migrations add
+                                AddNewField</code></li>
+                        <li><strong>Review Generated Code</strong> - EF Core creates Up() and Down() methods</li>
+                        <li><strong>Apply to Database</strong> - Run <code>dotnet ef database update</code></li>
+                        <li><strong>Commit Migration</strong> - Add the migration file to version control</li>
+                    </ol>
+                </div>
+
+                <p>
+                    Example: If you add a <code>PhoneNumber</code> property to the User entity, EF Core generates a
+                    migration that executes <code>ALTER TABLE Users ADD PhoneNumber varchar(20)</code> when applied.
+                </p>
+            </section>
+
+            <!-- LEVEL 4: REPOSITORY PATTERN -->
+            <section class="section">
+                <h2>Repository Pattern - Abstracting Data Access</h2>
+
+                <h3>Why Use Repositories?</h3>
+                <p>
+                    While Entity Framework provides data access, we don't want our Application Layer to depend directly
+                    on EF Core. Why? Because EF Core is an implementation detail. If we later want to switch to Dapper,
+                    or add caching, or use a NoSQL database for some entities, we don't want to rewrite all our business
+                    logic.
+                </p>
+
+                <p>
+                    The Repository Pattern solves this by creating an abstraction layer. The Domain Layer defines
+                    <em>what</em> data operations are needed (the interface), and the Infrastructure Layer implements
+                    <em>how</em> to perform those operations (the concrete class). This separation allows us to swap out
+                    implementations seamlessly. For example, during testing, we can use an
+                    <code>InMemoryUserRepository</code>
+                    that just stores users in a `List&lt;User&gt;`, allowing us to run unit tests instantly without
+                    spinning
+                    up a real database.
+                </p>
+
+                <h3>Repository Flow Diagram</h3>
+                <p>
+                    The following sequence diagram illustrates the flow of data when a service requests a user. Notice
+                    how the Application Service only interacts with the Interface, blissfully unaware of the complex
+                    EF Core machinery operating behind the scenes.
+                </p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant App as Application Service
+                    participant Interface as IUserRepository<br />(Domain)
+                    participant Impl as UserRepository<br />(Infrastructure)
+                    participant EF as DbContext
+                    participant DB as Database
+
+                    App->>Interface: GetByUsernameAsync("john")
+                    Interface->>Impl: (interface implemented by)
+                    Impl->>EF: Users.FirstOrDefaultAsync(...)
+                    EF->>DB: SELECT * FROM Users WHERE Username='john'
+                    DB-->>EF: Row data
+                    EF-->>Impl: User entity
+                    Impl-->>Interface: User entity
+                    Interface-->>App: User entity
+                </div>
+
+                <h3>UserRepository - Complete Implementation</h3>
+                <p>
+                    Let's examine the complete UserRepository implementation with detailed explanations:
+                </p>
+
+                <pre><code>using Gateway.Domain.Entities;
+using Gateway.Domain.Interfaces;
+using Gateway.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace Gateway.Infrastructure.Repositories;
+
+public sealed class UserRepository : IUserRepository
+{
+    private readonly GatewayDbContext _context;
+
+    // Dependency injection: receive the database context
+    public UserRepository(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    // Get user by ID
+    public async Task&lt;User?&gt; GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+    }
+
+    // Get user by username (used during login)
+    public async Task&lt;User?&gt; GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
+    }
+
+    // Create new user
+    public async Task&lt;User&gt; CreateAsync(User user, CancellationToken cancellationToken = default)
+    {
+        _context.Users.Add(user);  // Mark entity as added
+        await _context.SaveChangesAsync(cancellationToken);  // Persist to database
+        return user;  // Return with database-generated ID populated
+    }
+
+    // Update existing user
+    public async Task&lt;User&gt; UpdateAsync(User user, CancellationToken cancellationToken = default)
+    {
+        _context.Users.Update(user);  // Mark entity as modified
+        await _context.SaveChangesAsync(cancellationToken);  // Persist changes
+        return user;
+    }
+
+    // Delete user by ID
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var user = await GetByIdAsync(id, cancellationToken);
+        if (user != null)
+        {
+            _context.Users.Remove(user);  // Mark for deletion
+            await _context.SaveChangesAsync(cancellationToken);  // Execute DELETE
+        }
+    }
+
+    // Get all users (admin functionality)
+    public async Task&lt;IEnumerable&lt;User&gt;&gt; GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Users
+            .OrderBy(u => u.Username)  // Sort alphabetically
+            .ToListAsync(cancellationToken);
+    }
+}</code></pre>
+
+                <h3>Key Patterns in Repository Implementation</h3>
+
+                <div class="card">
+                    <div class="card-title">🎯 Repository Patterns Explained</div>
+
+                    <h4>1. Async/Await Throughout</h4>
+                    <p>Every database operation is async. This is crucial for scalability - while waiting for database
+                        I/O, the thread can handle other requests.</p>
+
+                    <h4>2. CancellationToken Support</h4>
+                    <p>The <code>cancellationToken</code> parameter allows operations to be cancelled if the HTTP
+                        request is aborted (e.g., user closes browser). This prevents wasted database work.</p>
+
+                    <h4>3. Nullable Return Types</h4>
+                    <p><code>Task&lt;User?&gt;</code> explicitly communicates that the method might not find anything.
+                        The <code>?</code> forces calling code to check for null.</p>
+
+                    <h4>4. FirstOrDefaultAsync vs SingleOrDefaultAsync</h4>
+                    <p><code>FirstOrDefaultAsync</code> returns the first match or null. It's efficient even if
+                        multiple matches exist. Use <code>SingleOrDefaultAsync</code> when you need to enforce that
+                        there's exactly zero or one result (throws exception if multiple).</p>
+
+                    <h4>5. SaveChanges Pattern</h4>
+                    <p>Changes aren't sent to the database until <code>SaveChangesAsync()</code> is called. This allows
+                        you to batch multiple operations into a single transaction.</p>
+                </div>
+
+                <h3>ConversationRepository with Eager Loading</h3>
+                <p>
+                    The ConversationRepository demonstrates a more advanced pattern: eager loading related entities.
+                    Here's the implementation:
+                </p>
+
+                <pre><code>public sealed class ConversationRepository : IConversationRepository
+{
+    private readonly GatewayDbContext _context;
+
+    public ConversationRepository(GatewayDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task&lt;Conversation?&gt; GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Conversations
+            .Include(c => c.User)  // Eager load the User navigation property
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    public async Task&lt;IEnumerable&lt;Conversation&gt;&gt; GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.Conversations
+            .Where(c => c.UserId == userId)
+            .OrderByDescending(c => c.UpdatedAt)  // Most recent first
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task&lt;Conversation&gt; CreateAsync(Conversation conversation, CancellationToken cancellationToken = default)
+    {
+        _context.Conversations.Add(conversation);
+        await _context.SaveChangesAsync(cancellationToken);
+        return conversation;
+    }
+
+    public async Task&lt;Conversation&gt; UpdateAsync(Conversation conversation, CancellationToken cancellationToken = default)
+    {
+        _context.Conversations.Update(conversation);
+        await _context.SaveChangesAsync(cancellationToken);
+        return conversation;
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var conversation = await GetByIdAsync(id, cancellationToken);
+        if (conversation != null)
+        {
+            _context.Conversations.Remove(conversation);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+}</code></pre>
+
+                <h3>Understanding Eager Loading with Include()</h3>
+                <p>
+                    The <code>.Include(c => c.User)</code> call is crucial. Without it, when you access
+                    <code>conversation.User</code>, EF Core would execute a separate database query (lazy loading) or
+                    return null. By including it in the original query, EF Core performs a SQL JOIN and loads everything
+                    in one round trip:
+                </p>
+
+                <pre><code>-- Without Include(): Two queries
+SELECT * FROM Conversations WHERE Id = ?
+SELECT * FROM Users WHERE Id = ?
+
+-- With Include(): One query with JOIN
+SELECT c.*, u.* 
+FROM Conversations c
+INNER JOIN Users u ON c.UserId = u.Id  
+WHERE c.Id = ?</code></pre>
+
+                <p>
+                    For conversation lists with many items, this can be the difference between 1 database query and 100+
+                    queries (N+1 problem).
+                </p>
+            </section>
+
+            <!-- LEVEL 5: LM STUDIO CLIENT -->
+            <section class="section">
+                <h2>LM Studio Client - External API Integration</h2>
+
+                <h3>What is LM Studio?</h3>
+                <p>
+                    LM Studio is a desktop application that runs Large Language Models (LLMs) locally on your computer.
+                    It provides an OpenAI-compatible API, meaning it accepts the same HTTP requests as OpenAI's GPT
+                    API. This allows AIGS to run completely locally without sending data to cloud services. By targeting
+                    this standard API, AIGS can theoretically work with any OpenAI-compatible provider, but we've
+                    optimized the experience for local inference.
+                </p>
+
+                <h3>HTTP Client Configuration</h3>
+                <p>
+                    The <code>LmStudioClient</code> is responsible for all communication with the AI engine. It uses
+                    .NET's <code>HttpClient</code> to send requests and receive responses. This client is registered
+                    as a singleton service and injected wherever AI capabilities are needed. It handles the low-level
+                    details of HTTP connections, timeouts, and error handling, presenting a clean, strongly-typed
+                    interface to the rest of the application.
+                </p>
+
+                <pre><code>using Gateway.Domain.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+
+namespace Gateway.Infrastructure.Services;
+
+public sealed class LmStudioClient : ILmStudioClient
+{
+    private readonly HttpClient _httpClient;
+    private readonly IMemoryCache _cache;
+    private readonly ILogger&lt;LmStudioClient&gt; _logger;
+
+    public LmStudioClient(HttpClient httpClient, IMemoryCache cache, ILogger&lt;LmStudioClient&gt; logger)
+    {
+        _httpClient = httpClient;
+        _cache = cache;
+        _logger = logger;
+    }
+
+    // ... methods below
+}</code></pre>
+
+                <h3>Getting Available Models with Caching</h3>
+                <p>
+                    The client can fetch a list of available models from LM Studio. Since this list doesn't change
+                    frequently, results are cached for 1 minute to reduce unnecessary API calls:
+                </p>
+
+                <pre><code>public async Task&lt;IEnumerable&lt;LmModel&gt;&gt; GetModelsAsync(CancellationToken cancellationToken = default)
+{
+    const string cacheKey = "lm_studio_models";
+    
+    // Check cache first
+    if (_cache.TryGetValue(cacheKey, out IEnumerable&lt;LmModel&gt;? cachedModels))
+    {
+        return cachedModels!;
+    }
+
+    try
+    {
+        // Call LM Studio API
+        var response = await _httpClient.GetAsync("/v1/models", cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        // Deserialize JSON response
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var modelsResponse = JsonSerializer.Deserialize&lt;ModelsResponse&gt;(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        // Transform to domain model
+        var models = modelsResponse?.Data?.Select(m => new LmModel(m.Id, m.Object, m.Created, m.OwnedBy)) 
+                     ?? Enumerable.Empty&lt;LmModel&gt;();
+
+        // Cache for 1 minute
+        _cache.Set(cacheKey, models, TimeSpan.FromMinutes(1));
+        
+        _logger.LogInformation("Retrieved {Count} models from LM Studio", models.Count());
+        
+        return models;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to retrieve models from LM Studio");
+        throw;
+    }
+}</code></pre>
+
+                <h3>Chat Completion with Streaming</h3>
+                <p>
+                    The most important functionality is sending chat messages and receiving streaming responses. This
+                    allows the UI to display text as it's generated, character by character, instead of waiting for the
+                    complete response:
+                </p>
+
+                <pre><code>public async Task&lt;Stream&gt; ChatCompletionStreamAsync(ChatCompletionRequest request, CancellationToken cancellationToken = default)
+{
+    try
+    {
+        // Serialize request to JSON (snake_case for OpenAI compatibility)
+        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        });
+
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        
+        // POST to LM Studio
+        var response = await _httpClient.PostAsync("/v1/chat/completions", content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        _logger.LogInformation("Started chat completion stream for model {Model}", request.Model);
+        
+        // Return the response stream for the caller to read
+        return await response.Content.ReadAsStreamAsync(cancellationToken);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to start chat completion stream for model {Model}", request.Model);
+        throw;
+    }
+}</code></pre>
+
+                <h3>Request/Response Flow</h3>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant API as Gateway API
+                    participant Client as LmStudioClient
+                    participant HTTP as HttpClient
+                    participant LM as LM Studio
+
+                    API->>Client: ChatCompletionStreamAsync(request)
+                    Client->>Client: Serialize request to JSON
+                    Client->>HTTP: POST /v1/chat/completions
+                    HTTP->>LM: HTTP Request
+                    LM-->>HTTP: HTTP 200 + streaming body
+                    HTTP-->>Client: Stream
+                    Client-->>API: Stream
+
+                    Note over API: API reads stream chunk by chunk
+
+                    loop Each chunk
+                    LM-->>HTTP: "data: {json}\n\n"
+                    HTTP-->>API: Chunk
+                    API->>API: Parse SSE format
+                    API->>API: Send to client browser
+                    end
+
+                    LM-->>HTTP: "data: [DONE]\n\n"
+                    HTTP-->>API: Stream ends
+                </div>
+
+                <p>
+                    The response is in Server-Sent Events (SSE) format, where each chunk is prefixed with
+                    <code>data:</code>. The API layer parses these chunks and forwards them to the browser in real-time.
+                </p>
+            </section>
+
+            <!-- LEVEL 6: ENCRYPTION SERVICE -->
+            <section class="section">
+                <h2>Encryption Service - Securing Messages</h2>
+
+                <h3>Why Encrypt Messages?</h3>
+                <p>
+                    Chat messages can contain sensitive information: personal details, confidential business data, or
+                    private conversations. While the database itself should be protected (file permissions, backups,
+                    etc.), adding encryption provides defense in depth: even if someone gains access to the database
+                    file, they can't read the message content without the encryption keys.
+                </p>
+
+                <p>
+                    AIGS implements <strong>optional</strong> message encryption. Users can enable it for their account,
+                    and all future messages are encrypted before being written to the database. This is transparent to
+                    the application layer - services just call encrypt/decrypt methods and don't need to know the
+                    cryptographic details.
+                </p>
+
+                <h3>AES-GCM Encryption Explained</h3>
+                <p>
+                    AIGS uses AES (Advanced Encryption Standard) in GCM (Galois/Counter Mode). Here's what that means in
+                    plain English:
+                </p>
+
+                <ul>
+                    <li><strong>AES</strong> - A symmetric encryption algorithm approved by the US government.
+                        "Symmetric"
+                        means the same key is used to encrypt and decrypt.</li>
+                    <li><strong>256-bit key</strong> - The encryption key is 256 bits (32 bytes) long. This makes brute
+                        force attacks computationally infeasible (would take millions of years with current computers).
+                    </li>
+                    <li><strong>GCM mode</strong> - Provides both encryption AND authentication. This means you can't
+                        tamper with the encrypted data without it being detected.</li>
+                    <li><strong>IV (Initialization Vector)</strong> - A random 12-byte value used once per message. This
+                        ensures the same message encrypted twice produces different ciphertext.</li>
+                    <li><strong>Tag</strong> - A 16-byte authentication tag that proves the data hasn't been modified.
+                    </li>
+                </ul>
+
+                <h3>Encryption Implementation</h3>
+                <p>Here's how message encryption works step by step:</p>
+
+                <pre><code>public async Task&lt;string&gt; EncryptMessageAsync(string content, string userId)
+{
+    try
+    {
+        // Step 1: Check if encryption is enabled for this user
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null || !user.EncryptionEnabled)
+        {
+            return content; // Return unencrypted if disabled
+        }
+
+        // Step 2: Get the user's active encryption key
+        var activeKey = await GetActiveEncryptionKeyAsync(userId);
+        if (activeKey == null)
+        {
+            _logger.LogWarning("No active encryption key found for user {UserId}", userId);
+            return content;
+        }
+
+        // Step 3: Generate a random IV (Initialization Vector) for this message
+        var iv = new byte[12]; // GCM recommended IV size
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(iv);
+        }
+
+        // Step 4: Prepare data for encryption
+        var keyBytes = Convert.FromBase64String(activeKey.Key);
+        var contentBytes = Encoding.UTF8.GetBytes(content);
+        
+        // Step 5: Encrypt using AES-GCM
+        using var aes = new AesGcm(keyBytes);
+        var encryptedBytes = new byte[contentBytes.Length];
+        var tag = new byte[16]; // GCM tag size
+        
+        aes.Encrypt(iv, contentBytes, encryptedBytes, tag);
+
+        // Step 6: Convert to Base64 for database storage
+        var encryptedContent = Convert.ToBase64String(encryptedBytes);
+        var ivBase64 = Convert.ToBase64String(iv);
+        var tagBase64 = Convert.ToBase64String(tag);
+
+        _logger.LogDebug("Message encrypted for user {UserId} with key {KeyId}", userId, activeKey.Id);
+
+        // Step 7: Return encrypted content with metadata (pipe-delimited)
+        return $"{encryptedContent}|{ivBase64}|{tagBase64}|{activeKey.Id}";
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to encrypt message for user {UserId}", userId);
+        throw new InvalidOperationException("Failed to encrypt message", ex);
+    }
+}</code></pre>
+
+                <h3>Why Store IV and Tag with the Encrypted Data?</h3>
+                <p>
+                    You might wonder: if we store the IV and tag alongside the encrypted content, doesn't that make
+                    encryption pointless? No! The IV and tag are not secret - they're meant to be public. The security
+                    comes from the encryption key, which is stored separately and never sent to clients. Without the
+                    key, having the IV and tag doesn't help an attacker decrypt the message.
+                </p>
+
+                <h3>Decryption Implementation</h3>
+                <p>Decryption reverses the process:</p>
+
+                <pre><code>public async Task&lt;string&gt; DecryptMessageAsync(string encryptedData, string encryptionKeyId, string userId)
+{
+    try
+    {
+        // Step 1: Check if encryption is enabled
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null || !user.EncryptionEnabled)
+        {
+            return encryptedData; // Return as-is if disabled
+        }
+
+        // Step 2: Parse the encrypted data format: content|iv|tag|keyId
+        var parts = encryptedData.Split('|');
+        if (parts.Length != 4)
+        {
+            _logger.LogWarning("Invalid encrypted data format for user {UserId}", userId);
+            return encryptedData;
+        }
+
+        var encryptedContent = parts[0];
+        var ivBase64 = parts[1];
+        var tagBase64 = parts[2];
+        var keyId = parts[3];
+
+        // Step 3: Retrieve the encryption key from database
+        var encryptionKey = await _context.EncryptionKeys
+            .FirstOrDefaultAsync(k => k.Id == keyId && k.UserId == userId);
+
+        if (encryptionKey == null)
+        {
+            _logger.LogWarning("Encryption key {KeyId} not found for user {UserId}", keyId, userId);
+            return encryptedData;
+        }
+
+        // Step 4: Convert from Base64
+        var keyBytes = Convert.FromBase64String(encryptionKey.Key);
+        var iv = Convert.FromBase64String(ivBase64);
+        var tag = Convert.FromBase64String(tagBase64);
+        var encryptedBytes = Convert.FromBase64String(encryptedContent);
+
+        // Step 5: Decrypt using AES-GCM
+        using var aes = new AesGcm(keyBytes);
+        var decryptedBytes = new byte[encryptedBytes.Length];
+        
+        aes.Decrypt(iv, encryptedBytes, tag, decryptedBytes);
+
+        // Step 6: Convert back to string
+        var decryptedContent = Encoding.UTF8.GetString(decryptedBytes);
+
+        _logger.LogDebug("Message decrypted for user {UserId} with key {KeyId}", userId, keyId);
+
+        return decryptedContent;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to decrypt message for user {UserId}", userId);
+        throw new InvalidOperationException("Failed to decrypt message", ex);
+    }
+}</code></pre>
+
+                <h3>Key Management and Rotation</h3>
+                <p>
+                    Encryption keys should be rotated periodically for security. AIGS supports key rotation: generating
+                    a new key while keeping old keys around to decrypt existing messages. Here's how key generation
+                    works:
+                </p>
+
+                <pre><code>public async Task&lt;string&gt; GenerateNewEncryptionKeyAsync(string userId)
+{
+    try
+    {
+        // Generate a cryptographically secure random 256-bit key
+        var keyBytes = new byte[32]; // 256 bits = 32 bytes
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(keyBytes);
+        }
+
+        var keyBase64 = Convert.ToBase64String(keyBytes);
+        var keyId = Guid.NewGuid().ToString();
+
+        // Create new encryption key entity
+        var encryptionKey = new EncryptionKey
+        {
+            Id = keyId,
+            UserId = userId,
+            Key = keyBase64,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true,
+            Version = 1
+        };
+
+        // Deactivate old keys for this user (but don't delete them!)
+        var oldKeys = await _context.EncryptionKeys
+            .Where(k => k.UserId == userId && k.IsActive)
+            .ToListAsync();
+
+        foreach (var oldKey in oldKeys)
+        {
+            oldKey.IsActive = false;
+            oldKey.DeactivatedAt = DateTime.UtcNow;
+        }
+
+        // Add new key to database
+        _context.EncryptionKeys.Add(encryptionKey);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("New encryption key generated for user {UserId}", userId);
+
+        return keyId;
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to generate new encryption key for user {UserId}", userId);
+        throw new InvalidOperationException("Failed to generate encryption key", ex);
+    }
+}</code></pre>
+
+                <div class="card">
+                    <div class="card-title">🔐 Encryption Security Best Practices</div>
+                    <ul>
+                        <li><strong>Never Delete Old Keys</strong> - Old keys must be kept to decrypt historical
+                            messages. Only mark them as inactive.</li>
+                        <li><strong>Unique IV Per Message</strong> - Never reuse an IV with the same key. AIGS
+                            generates a random IV for each encryption.</li>
+                        <li><strong>Authenticated Encryption</strong> - GCM mode provides both confidentiality (via
+                            encryption) and integrity (via authentication tag).</li>
+                        <li><strong>Key Storage</strong> - Keys are stored in the database, not in code or config files.
+                            In production, consider using a key management service (KMS).</li>
+                        <li><strong>User-Specific Keys</strong> - Each user has their own encryption keys. This
+                            prevents cross-user data leakage.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- DATABASE TECHNOLOGIES -->
+            <section class="section">
+                <h2>Database Technologies</h2>
+
+                <h3>SQLite for Development</h3>
+                <p>
+                    SQLite is a file-based database - the entire database is a single file on disk. It's perfect for
+                    development and single-user deployments because:
+                </p>
+
+                <ul>
+                    <li><strong>Zero Configuration</strong> - No server to install or configure</li>
+                    <li><strong>Portable</strong> - Copy the .db file to move the entire database</li>
+                    <li><strong>Fast</strong> - No network overhead, direct file access</li>
+                    <li><strong>Reliable</strong> - Used in billions of devices (phones, browsers, etc.)</li>
+                </ul>
+
+                <p>Connection string for SQLite:</p>
+                <pre><code>"ConnectionStrings": {
+  "DefaultConnection": "Data Source=gateway.db"
+}</code></pre>
+
+                <h3>PostgreSQL for Production</h3>
+                <p>
+                    For multi-user production deployments, PostgreSQL is recommended:
+                </p>
+
+                <ul>
+                    <li><strong>Concurrent Access</strong> - Handles many simultaneous connections</li>
+                    <li><strong>ACID Compliance</strong> - Full transactional guarantees</li>
+                    <li><strong>Scalability</strong> - Can handle terabytes of data</li>
+                    <li><strong>Advanced Features</strong> - Full-text search, JSON columns, etc.</li>
+                </ul>
+
+                <p>Connection string for PostgreSQL:</p>
+                <pre><code>"ConnectionStrings": {
+  "DefaultConnection": "Host=localhost;Database=gateway;Username=postgres;Password=yourpassword"
+}</code></pre>
+
+                <h3>Switching Databases</h3>
+                <p>
+                    Thanks to Entity Framework Core's database provider system, switching is simple:
+                </p>
+
+                <pre><code>// SQLite (in Program.cs or Startup.cs)
+services.AddDbContext&lt;GatewayDbContext&gt;(options =>
+    options.UseSqlite(configuration.GetConnectionString("DefaultConnection")));
+
+// PostgreSQL (just change one line!)
+services.AddDbContext&lt;GatewayDbContext&gt;(options =>
+    options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));</code></pre>
+
+                <p>
+                    Your repository code doesn't change at all. EF Core handles the SQL dialect differences
+                    automatically.
+                </p>
+            </section>
+
+            <!-- NEXT STEPS -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="application-layer.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📦 Application Layer</div>
+                        <p class="card-description">Learn how services orchestrate use cases and coordinate between
+                            domain and infrastructure</p>
+                    </a>
+
+                    <a href="domain-models.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🎯 Domain Models</div>
+                        <p class="card-description">Deep dive into entities: User, Conversation, Message, and their
+                            relationships</p>
+                    </a>
+
+                    <a href="frontend.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🎨 Frontend Architecture</div>
+                        <p class="card-description">Explore the React frontend, component hierarchy, and API
+                            integration</p>
+                    </a>
+
+                    <a href="integration-flows.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🔄 Integration Flows</div>
+                        <p class="card-description">End-to-end tracing of complete user journeys through the system</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite. Built with ❤️ for local-first AI.</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

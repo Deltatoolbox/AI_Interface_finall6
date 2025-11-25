@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Development Guide</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+            <a href="development.html" class="nav-link active">Development</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Development Guide</span>
+            </div>
+
+            <h1>Development Guide</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                Everything you need to know to set up your development environment, run tests, and contribute to AIGS.
+            </p>
+
+            <!-- Prerequisites -->
+            <section class="section">
+                <h2>Prerequisites</h2>
+                <ul>
+                    <li><strong>.NET 8 SDK</strong> - <a href="https://dotnet.microsoft.com/download"
+                            target="_blank">Download here</a></li>
+                    <li><strong>Node.js 18+</strong> and npm - <a href="https://nodejs.org/" target="_blank">Download
+                            here</a></li>
+                    <li><strong>LM Studio</strong> - For local AI models (<a href="https://lmstudio.ai/"
+                            target="_blank">lmstudio.ai</a>)</li>
+                    <li><strong>Git</strong> - For version control</li>
+                    <li><strong>IDE</strong> - Visual Studio, VS Code, or Rider recommended</li>
+                </ul>
+            </section>
+
+            <!-- Quick Setup -->
+            <section class="section">
+                <h2>Quick Setup</h2>
+
+                <h3>1. Clone the Repository</h3>
+                <pre><code>git clone &lt;repository-url&gt;
+cd AI_Interface</code></pre>
+
+                <h3>2. Backend Setup</h3>
+                <pre><code># Restore NuGet packages
+dotnet restore
+
+# Run database migrations (for layered stack)
+dotnet ef migrations add InitialCreate \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+
+dotnet ef database update \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+
+# Or for SimpleGateway
+cd src/SimpleGateway
+dotnet ef database update</code></pre>
+
+                <h3>3. Frontend Setup</h3>
+                <pre><code>cd src/WebApp
+npm install</code></pre>
+
+                <h3>4. Start Development Servers</h3>
+                <p><strong>Option A: SimpleGateway (All-in-one)</strong></p>
+                <pre><code>./setup-local.sh  # First time only
+./start-simple.sh
+
+# Access at: http://localhost</code></pre>
+
+                <p><strong>Option B: Layered Stack (Separate services)</strong></p>
+                <pre><code># Terminal 1: Backend
+dotnet run --project src/Gateway.Api
+
+# Terminal 2: Frontend
+cd src/WebApp
+npm run dev
+
+# Backend: http://localhost:5000
+# Frontend: http://localhost:5173</code></pre>
+            </section>
+
+            <!-- Running Tests -->
+            <section class="section">
+                <h2>Running Tests</h2>
+
+                <h3>All Tests</h3>
+                <pre><code>dotnet test</code></pre>
+
+                <h3>Unit Tests Only</h3>
+                <pre><code>dotnet test tests/Gateway.UnitTests</code></pre>
+
+                <h3>Integration Tests Only</h3>
+                <pre><code>dotnet test tests/Gateway.IntegrationTests</code></pre>
+
+                <h3>With Code Coverage</h3>
+                <pre><code>dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover</code></pre>
+            </section>
+
+            <!-- Database Migrations -->
+            <section class="section">
+                <h2>Database Migrations</h2>
+
+                <h3>Creating a New Migration (Layered Stack)</h3>
+                <pre><code>dotnet ef migrations add MigrationName \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api</code></pre>
+
+                <h3>Applying Migrations</h3>
+                <pre><code>dotnet ef database update \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api</code></pre>
+
+                <h3>Reset Database</h3>
+                <pre><code>dotnet ef database drop \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+
+dotnet ef database update \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api</code></pre>
+
+                <h3>SimpleGateway Migrations</h3>
+                <pre><code>cd src/SimpleGateway
+dotnet ef migrations add MigrationName
+dotnet ef database update</code></pre>
+            </section>
+
+            <!-- Project Structure -->
+            <section class="section">
+                <h2>Project Structure</h2>
+                <pre><code>AI_Interface/
+├── src/
+│   ├── Gateway.Api/              # HTTP endpoints, DI, middleware
+│   │   ├── Program.cs           # Application entry point
+│   │   └── appsettings.json      # Configuration
+│   │
+│   ├── Gateway.Application/      # Business logic layer
+│   │   ├── Services/            # Application services
+│   │   ├── DTOs/                # Data transfer objects
+│   │   └── Validators/          # FluentValidation validators
+│   │
+│   ├── Gateway.Domain/           # Core domain layer
+│   │   ├── Entities/            # Domain models (User, Conversation, Message)
+│   │   └── Interfaces/          # Repository and service contracts
+│   │
+│   ├── Gateway.Infrastructure/   # Data access layer
+│   │   ├── Data/                # EF Core DbContext
+│   │   ├── Repositories/        # Repository implementations
+│   │   └── Migrations/          # EF Core migrations
+│   │
+│   ├── SimpleGateway/            # Monolithic alternative
+│   │   ├── Program.cs           # All-in-one application
+│   │   ├── Services/            # Business logic services
+│   │   └── Data/                # SQLite database context
+│   │
+│   └── WebApp/                   # React frontend
+│       ├── src/
+│       │   ├── components/      # Reusable UI components
+│       │   ├── pages/           # Page components
+│       │   ├── contexts/        # React contexts
+│       │   └── api.ts           # API client
+│       └── package.json
+│
+├── tests/
+│   ├── Gateway.UnitTests/        # Unit tests
+│   └── Gateway.IntegrationTests/ # Integration tests
+│
+├── deploy/                       # Deployment configurations
+│   ├── caddy/
+│   ├── nginx/
+│   └── systemd/
+│
+└── docs/                         # This documentation</code></pre>
+            </section>
+
+            <!-- Code Organization -->
+            <section class="section">
+                <h2>Code Organization</h2>
+
+                <h3>Clean Architecture Layers</h3>
+                <ul>
+                    <li><strong>Domain</strong> - Core business entities and interfaces (no dependencies)</li>
+                    <li><strong>Application</strong> - Use cases and orchestration (depends on Domain)</li>
+                    <li><strong>Infrastructure</strong> - External concerns: DB, HTTP clients (depends on Domain)</li>
+                    <li><strong>API</strong> - HTTP layer and DI wiring (depends on all)</li>
+                </ul>
+
+                <h3>Dependency Flow</h3>
+                <pre><code>Api → Application → Domain ← Infrastructure</code></pre>
+                <p>Dependencies point inward. Infrastructure depends on Domain interfaces, not vice versa.</p>
+            </section>
+
+            <!-- Adding Features -->
+            <section class="section">
+                <h2>Adding New Features</h2>
+
+                <h3>1. Define Domain Model</h3>
+                <pre><code>// src/Gateway.Domain/Entities/NewEntity.cs
+public sealed class NewEntity
+{
+    public Guid Id { get; set; }
+    // Properties...
+}</code></pre>
+
+                <h3>2. Add Repository Interface</h3>
+                <pre><code>// src/Gateway.Domain/Interfaces/INewEntityRepository.cs
+public interface INewEntityRepository
+{
+    Task&lt;NewEntity?&gt; GetByIdAsync(Guid id);
+    // Methods...
+}</code></pre>
+
+                <h3>3. Implement Repository</h3>
+                <pre><code>// src/Gateway.Infrastructure/Repositories/NewEntityRepository.cs
+public class NewEntityRepository : INewEntityRepository
+{
+    private readonly GatewayDbContext _context;
+    
+    public NewEntityRepository(GatewayDbContext context)
+    {
+        _context = context;
+    }
+    
+    public async Task&lt;NewEntity?&gt; GetByIdAsync(Guid id)
+    {
+        return await _context.NewEntities.FindAsync(id);
+    }
+}</code></pre>
+
+                <h3>4. Create Service</h3>
+                <pre><code>// src/Gateway.Application/Services/NewEntityService.cs
+public class NewEntityService : INewEntityService
+{
+    private readonly INewEntityRepository _repository;
+    
+    public NewEntityService(INewEntityRepository repository)
+    {
+        _repository = repository;
+    }
+    
+    // Service methods...
+}</code></pre>
+
+                <h3>5. Add API Endpoint</h3>
+                <pre><code>// src/Gateway.Api/Program.cs
+app.MapGet("/api/newentities/{id}", async (Guid id, INewEntityService service) =&gt;
+{
+    var entity = await service.GetByIdAsync(id);
+    return entity is null ? Results.NotFound() : Results.Ok(entity);
+});</code></pre>
+
+                <h3>6. Register in DI</h3>
+                <pre><code>// src/Gateway.Api/Program.cs
+builder.Services.AddScoped&lt;INewEntityRepository, NewEntityRepository&gt;();
+builder.Services.AddScoped&lt;INewEntityService, NewEntityService&gt;();</code></pre>
+
+                <h3>7. Add Migration</h3>
+                <pre><code>dotnet ef migrations add AddNewEntity \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+
+dotnet ef database update \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api</code></pre>
+            </section>
+
+            <!-- Configuration -->
+            <section class="section">
+                <h2>Configuration</h2>
+
+                <h3>appsettings.json Structure</h3>
+                <pre><code>{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=gateway.db"
+  },
+  "JwtSettings": {
+    "Issuer": "AIGS",
+    "Audience": "AIGS-Users",
+    "SecretKey": "your-secret-key-min-32-chars",
+    "ExpirationHours": 24
+  },
+  "LmStudio": {
+    "BaseUrl": "http://127.0.0.1:1234"
+  },
+  "UserManagement": {
+    "AllowSelfRegistration": true,
+    "DefaultRole": "User"
+  }
+}</code></pre>
+
+                <h3>Environment Variables</h3>
+                <p>Override settings using environment variables:</p>
+                <pre><code>export ConnectionStrings__DefaultConnection="Data Source=prod.db"
+export JwtSettings__SecretKey="your-production-key"
+export LmStudio__BaseUrl="http://localhost:1234"</code></pre>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section class="section">
+                <h2>Troubleshooting</h2>
+
+                <h3>Port Already in Use</h3>
+                <pre><code># Find process using port 5000
+lsof -i :5000
+
+# Kill the process
+kill -9 &lt;PID&gt;</code></pre>
+
+                <h3>Database Locked</h3>
+                <p>Close all database connections and restart the application. For SQLite, delete the database file and
+                    recreate:</p>
+                <pre><code>rm gateway.db
+dotnet ef database update</code></pre>
+
+                <h3>LM Studio Connection Failed</h3>
+                <ul>
+                    <li>Ensure LM Studio is running on <code>http://127.0.0.1:1234</code></li>
+                    <li>Check that a model is loaded in LM Studio</li>
+                    <li>Verify <code>LmStudio:BaseUrl</code> in appsettings.json</li>
+                </ul>
+
+                <h3>Frontend Build Errors</h3>
+                <pre><code>cd src/WebApp
+rm -rf node_modules
+npm cache clean --force
+npm install</code></pre>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+                <h2>Best Practices</h2>
+                <ul>
+                    <li><strong>Clean Architecture</strong> - Keep dependencies pointing inward</li>
+                    <li><strong>Dependency Injection</strong> - Use constructor injection for all dependencies</li>
+                    <li><strong>Async/Await</strong> - Use async methods for all I/O operations</li>
+                    <li><strong>Validation</strong> - Use FluentValidation for input validation</li>
+                    <li><strong>Error Handling</strong> - Return proper HTTP status codes and Problem Details</li>
+                    <li><strong>Testing</strong> - Write unit tests for business logic, integration tests for APIs</li>
+                    <li><strong>Logging</strong> - Use structured logging with appropriate log levels</li>
+                    <li><strong>Security</strong> - Never store secrets in code, use environment variables</li>
+                </ul>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="api-reference.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📡 API Reference</div>
+                        <p class="card-description">Explore all available API endpoints and their usage.</p>
+                    </a>
+
+                    <a href="domain-models.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🗄️ Domain Models</div>
+                        <p class="card-description">Learn about the core entities and their relationships.</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

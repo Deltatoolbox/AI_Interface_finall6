@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Architecture & Design</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link active">Architecture</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+            <a href="development.html" class="nav-link">Development</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Architecture</span>
+            </div>
+
+            <h1>Architecture & System Design</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                This page provides a high-level overview of AIGS architecture. For in-depth technical details, code
+                examples, and step-by-step explanations, explore the dedicated deep-dive pages below. Each sub-page is
+                designed to guide you from conceptual understanding to implementation mastery, with content accessible
+                to readers of all technical levels.
+            </p>
+
+            <!-- High-Level Architecture -->
+            <section class="section">
+                <h2>High-Level System Architecture</h2>
+                <p>
+                    AIGS follows a <strong>clean architecture</strong> pattern with clear separation of concerns. The
+                    system can be deployed in two modes: a monolithic SimpleGateway for simplicity, or a layered
+                    architecture for scalability and maintainability.
+                </p>
+
+                <h3>Complete System Diagram</h3>
+                <p>
+                    The diagram below illustrates the entire AIGS ecosystem. At the top, we have the clients (browsers,
+                    mobile apps) interacting with the system through a reverse proxy. The core application logic resides
+                    in the backend, which orchestrates communication between the database, the AI models, and the
+                    frontend.
+                </p>
+                <p>
+                    Notice how the <strong>Application Layer</strong> sits in the middle, acting as the conductor. It
+                    doesn't know about HTTP or databases directly; it speaks the language of the <strong>Domain
+                        Layer</strong>. The <strong>Infrastructure Layer</strong> then translates these domain needs
+                    into
+                    concrete actions, like SQL queries or HTTP requests to LM Studio.
+                </p>
+
+                <div class="mermaid">
+                    graph TB
+                    subgraph "Client Layer"
+                    Browser[Web Browser]
+                    Mobile[Mobile App*]
+                    end
+
+                    subgraph "Reverse Proxy"
+                    Caddy[Caddy / Nginx<br />Port 80/443]
+                    end
+
+                    subgraph "Frontend"
+                    React[React App<br />Vite Dev Server<br />Port 5173]
+                    StaticFiles[Static Files<br />HTML/CSS/JS]
+                    end
+
+                    subgraph "Backend - Gateway.Api"
+                    API[Minimal APIs<br />Port 5000]
+                    Auth[Auth Middleware<br />JWT Validation]
+                    CORS[CORS Middleware]
+                    Health[Health Checks]
+                    Metrics[Prometheus Metrics]
+                    end
+
+                    subgraph "Application Layer"
+                    UserSvc[User Service]
+                    ConvSvc[Conversation Service]
+                    MsgSvc[Message Service]
+                    ChatSvc[Chat Template Service]
+                    AdminSvc[Admin Services]
+                    DTOs[DTOs & Validators]
+                    end
+
+                    subgraph "Domain Layer"
+                    UserEnt[User Entity]
+                    ConvEnt[Conversation Entity]
+                    MsgEnt[Message Entity]
+                    LogEnt[UsageLog Entity]
+                    Interfaces[Repository Interfaces]
+                    end
+
+                    subgraph "Infrastructure Layer"
+                    DbContext[EF Core DbContext]
+                    UserRepo[User Repository]
+                    ConvRepo[Conversation Repository]
+                    LLMClient[LM Studio Client]
+                    Encryption[Encryption Service]
+                    end
+
+                    subgraph "Data Layer"
+                    SQLite[(SQLite DB<br />Development)]
+                    Postgres[(PostgreSQL<br />Production*)]
+                    end
+
+                    subgraph "AI Layer"
+                    LMStudio[LM Studio<br />Port 1234<br />OpenAI API]
+                    Models[Local LLM Models<br />Llama, Mistral, etc.]
+                    end
+
+                    Browser --> Caddy
+                    Mobile -.-> Caddy
+                    Caddy --> React
+                    Caddy --> API
+                    React --> StaticFiles
+                    React -.HTTP Requests.-> API
+
+                    API --> Auth
+                    API --> CORS
+                    API --> Health
+                    API --> Metrics
+                    API --> UserSvc
+                    API --> ConvSvc
+                    API --> MsgSvc
+                    API --> ChatSvc
+                    API --> AdminSvc
+
+                    UserSvc --> DTOs
+                    ConvSvc --> DTOs
+                    MsgSvc --> DTOs
+
+                    UserSvc --> UserEnt
+                    ConvSvc --> ConvEnt
+                    MsgSvc --> MsgEnt
+                    AdminSvc --> LogEnt
+
+                    UserEnt --> Interfaces
+                    ConvEnt --> Interfaces
+                    MsgEnt --> Interfaces
+
+                    Interfaces --> UserRepo
+                    Interfaces --> ConvRepo
+                    UserRepo --> DbContext
+                    ConvRepo --> DbContext
+                    MsgSvc --> LLMClient
+                    MsgSvc --> Encryption
+
+                    DbContext --> SQLite
+                    DbContext -.-> Postgres
+
+                    LLMClient --> LMStudio
+                    LMStudio --> Models
+
+                    style Browser fill:#e1f5ff
+                    style React fill:#61dafb
+                    style API fill:#512bd4
+                    style LMStudio fill:#ff6b6b
+                    style SQLite fill:#003b57
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Note:</strong> Components marked with * (Mobile App, PostgreSQL) are optional or production
+                    alternatives. The core system works with browser client and SQLite.
+                </div>
+            </section>
+
+            <!-- ARCHITECTURE DEEP DIVES -->
+            <section class="section">
+                <h2>Architecture Deep Dives</h2>
+                <p>
+                    Explore detailed, comprehensive guides for each architectural layer and component. Each page
+                    progressively explains concepts from beginner-friendly overviews to detailed code examples.
+                </p>
+
+                <div style="display: grid; gap: 1.5rem; margin-top: 2rem;">
+                    <a href="application-layer.html" class="card"
+                        style="text-decoration: none; border-left: 4px solid #2196f3;">
+                        <div class="card-title" style="color: #2196f3;">📦 Application Layer - Use Case Orchestration
+                        </div>
+                        <p class="card-description" style="margin-top: 0.5rem;">
+                            Deep dive into services that coordinate business workflows. Learn about UserService,
+                            ConversationService, DTOs, FluentValidation, JWT token generation, and how services work
+                            together to implement complete use cases. Includes comprehensive code examples and patterns.
+                        </p>
+                        <div style="margin-top: 1rem; font-weight: 600; color: #2196f3;">Explore Application Layer →
+                        </div>
+                    </a>
+
+                    <a href="infrastructure-layer.html" class="card"
+                        style="text-decoration: none; border-left: 4px solid #4caf50;">
+                        <div class="card-title" style="color: #4caf50;">🔧 Infrastructure Layer - External Integrations
+                        </div>
+                        <p class="card-description" style="margin-top: 0.5rem;">
+                            Master database access with Entity Framework Core, repository pattern implementation, LM
+                            Studio HTTP client integration, and AES-GCM encryption service. Understand how AIGS connects
+                            to external systems while keeping business logic pure. Complete with DbContext
+                            configuration,
+                            migration workflows, and security best practices.
+                        </p>
+                        <div style="margin-top: 1rem; font-weight: 600; color: #4caf50;">Explore Infrastructure Layer →
+                        </div>
+                    </a>
+
+                    <a href="frontend.html" class="card" style="text-decoration: none; border-left: 4px solid #61dafb;">
+                        <div class="card-title" style="color: #61dafb;">⚛️ Frontend Architecture - React WebApp</div>
+                        <p class="card-description" style="margin-top: 0.5rem;">
+                            Complete guide to the React 18 frontend with TypeScript and Tailwind CSS. Explore component
+                            hierarchy, AuthContext state management, API integration patterns, streaming chat responses,
+                            Markdown rendering, syntax highlighting, and responsive design. Learn how the SPA delivers a
+                            seamless user experience.
+                        </p>
+                        <div style="margin-top: 1rem; font-weight: 600; color: #61dafb;">Explore Frontend Architecture →
+                        </div>
+                    </a>
+
+                    <a href="integration-flows.html" class="card"
+                        style="text-decoration: none; border-left: 4px solid #ff9800;">
+                        <div class="card-title" style="color: #ff9800;">🔄 Integration Flows - End-to-End Journeys</div>
+                        <p class="card-description" style="margin-top: 0.5rem;">
+                            Trace complete user actions through the entire system. Follow registration, login,
+                            streaming chat message flow, conversation management, and error handling from frontend click
+                            to database and back. Includes detailed sequence diagrams and step-by-step explanations for
+                            each flow.
+                        </p>
+                        <div style="margin-top: 1rem; font-weight: 600; color: #ff9800;">Explore Integration Flows →
+                        </div>
+                    </a>
+
+                    <a href="domain-models.html" class="card"
+                        style="text-decoration: none; border-left: 4px solid #9c27b0;">
+                        <div class="card-title" style="color: #9c27b0;">🎯 Domain Models - Core Entities</div>
+                        <p class="card-description" style="margin-top: 0.5rem;">
+                            Understand the core business entities (User, Conversation, Message, UsageLog) that form the
+                            heart of the application. See complete source code with detailed explanations of properties,
+                            relationships, and business rules. Learn how entities define the domain model independent of
+                            infrastructure concerns.
+                        </p>
+                        <div style="margin-top: 1rem; font-weight: 600; color: #9c27b0;">Explore Domain Models →</div>
+                    </a>
+                </div>
+            </section>
+
+
+            <!-- Deployment Shapes -->
+            <section class="section">
+                <h2>Deployment Shapes</h2>
+                <p>
+                    One of AIGS's strengths is its flexibility. Depending on your needs, you can deploy it as a
+                    lightweight, single-file executable or as a robust, distributed system.
+                </p>
+
+                <h3>1. SimpleGateway (Monolithic)</h3>
+                <p>
+                    For personal use, demos, or local development, the <strong>SimpleGateway</strong> mode is ideal. It
+                    packages the frontend, backend, and database access into a single process.
+                </p>
+                <p>
+                    In this mode, the "network" calls between layers are just function calls in memory. It's incredibly
+                    fast and easy to manage—just run one `.exe` file, and you have a full AI chat system.
+                </p>
+
+                <div class="mermaid">
+                    graph LR
+                    Client[Browser] --> Caddy[Caddy<br />Reverse Proxy]
+                    Caddy --> Frontend[React Static Files]
+                    Caddy --> SimpleGW[SimpleGateway.exe<br />Single Process]
+
+                    SimpleGW --> SQLite[(SQLite DB)]
+                    SimpleGW --> LMStudio[LM Studio<br />:1234]
+
+                    subgraph "Single Executable"
+                    SimpleGW
+                    Services[All Services<br />Integrated]
+                    Data[EF Core<br />DbContext]
+                    Services -.included in.-> SimpleGW
+                    Data -.included in.-> SimpleGW
+                    end
+
+                    style SimpleGW fill:#4caf50
+                    style SQLite fill:#003b57
+                </div>
+
+                <div class="card">
+                    <div class="card-title">✅ Advantages of SimpleGateway</div>
+                    <ul>
+                        <li><strong>Simple Deployment</strong> - Single executable, one command to start</li>
+                        <li><strong>Low Resource Usage</strong> - Minimal overhead, perfect for local/dev</li>
+                        <li><strong>Fast Startup</strong> - No inter-process communication</li>
+                        <li><strong>Easy Debugging</strong> - Everything in one process</li>
+                        <li><strong>Portable</strong> - Copy and run, no complex setup</li>
+                        <li><strong>Built-in Tools</strong> - Backup, migration, admin tools included</li>
+                    </ul>
+
+                    <div class="card-title" style="margin-top: 1rem;">⚠️ Limitations</div>
+                    <ul>
+                        <li>Cannot scale horizontally (single process)</li>
+                        <li>Harder to replace individual components</li>
+                        <li>Testing requires full application context</li>
+                        <li>All code changes require full rebuild</li>
+                    </ul>
+
+                    <div class="card-title" style="margin-top: 1rem;">💡 Best For</div>
+                    <ul>
+                        <li>Local development and testing</li>
+                        <li>Single-user deployments</li>
+                        <li>Proof-of-concept and demos</li>
+                        <li>Air-gapped or offline environments</li>
+                        <li>Personal AI assistant setups</li>
+                    </ul>
+                </div>
+
+                <h3>2. Layered Architecture</h3>
+                <p>
+                    For production environments where scalability and maintainability are key, the <strong>Layered
+                        Architecture</strong> is the way to go. This approach strictly separates concerns, allowing each
+                    part of the system to evolve independently.
+                </p>
+                <p>
+                    Here, the API, Application, Domain, and Infrastructure layers are distinct. You could swap out the
+                    database (e.g., from SQLite to PostgreSQL) without touching the business logic, or replace the
+                    frontend without affecting the backend.
+                </p>
+
+                <div class="mermaid">
+                    graph TB
+                    Client[Browser] --> Proxy[Reverse Proxy]
+
+                    Proxy --> Frontend[React App<br />Static Hosting]
+                    Proxy --> ApiLayer[Gateway.Api<br />HTTP Layer]
+
+                    ApiLayer --> AppLayer[Gateway.Application<br />Business Logic]
+                    AppLayer --> DomainLayer[Gateway.Domain<br />Core Entities]
+                    AppLayer --> InfraLayer[Gateway.Infrastructure<br />Data Access]
+
+                    InfraLayer --> Database[(Database<br />SQLite/Postgres)]
+                    InfraLayer --> External[External Services<br />LM Studio]
+
+                    subgraph "Clean Architecture Layers"
+                    ApiLayer
+                    AppLayer
+                    DomainLayer
+                    InfraLayer
+                    end
+
+                    style DomainLayer fill:#ff9800
+                    style AppLayer fill:#2196f3
+                    style InfraLayer fill:#4caf50
+                    style ApiLayer fill:#9c27b0
+                </div>
+
+                <div class="card">
+                    <div class="card-title">✅ Advantages of Layered Architecture</div>
+                    <ul>
+                        <li><strong>Separation of Concerns</strong> - Each layer has a single responsibility</li>
+                        <li><strong>Testability</strong> - Easy to mock dependencies and unit test</li>
+                        <li><strong>Flexibility</strong> - Swap implementations without affecting other layers</li>
+                        <li><strong>Scalability</strong> - Can scale API layer independently</li>
+                        <li><strong>Maintainability</strong> - Clear boundaries make changes easier</li>
+                        <li><strong>Team Collaboration</strong> - Different teams can work on different layers</li>
+                    </ul>
+
+                    <div class="card-title" style="margin-top: 1rem;">⚠️ Limitations</div>
+                    <ul>
+                        <li>More complex setup and configuration</li>
+                        <li>Higher initial learning curve</li>
+                        <li>More files and projects to manage</li>
+                        <li>Potential over-engineering for simple use cases</li>
+                    </ul>
+
+                    <div class="card-title" style="margin-top: 1rem;">💡 Best For</div>
+                    <ul>
+                        <li>Production deployments</li>
+                        <li>Team development</li>
+                        <li>Applications requiring horizontal scaling</li>
+                        <li>Projects with complex business logic</li>
+                        <li>Long-term maintenance and evolution</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Layer Responsibilities -->
+            <section class="section">
+                <h2>Layer Responsibilities (Clean Architecture)</h2>
+                <p>
+                    The layered architecture isn't just about organizing files; it's about managing dependencies. AIGS
+                    strictly follows the <strong>Dependency Inversion Principle</strong>. This means that high-level
+                    policy (the Domain) should never depend on low-level details (the Database or API).
+                </p>
+
+                <h3>Dependency Flow</h3>
+                <p>
+                    In the diagram below, notice how all arrows point <em>inward</em> toward the Domain Layer. The
+                    Domain
+                    is the "boss" - it defines the rules. The Infrastructure layer is just a plugin that fulfills those
+                    rules.
+                </p>
+
+                <div class="mermaid">
+                    graph LR
+                    Api[API Layer] -->|depends on| App[Application Layer]
+                    App -->|depends on| Domain[Domain Layer]
+                    Infra[Infrastructure Layer] -->|depends on| Domain
+                    Api -->|wires up| Infra
+
+                    style Domain fill:#ff9800,color:#fff
+                    style App fill:#2196f3,color:#fff
+                    style Api fill:#9c27b0,color:#fff
+                    style Infra fill:#4caf50,color:#fff
+                </div>
+
+                <h3>1. Domain Layer (Core)</h3>
+                <div class="card">
+                    <p><strong>Location:</strong> <code>src/Gateway.Domain/</code></p>
+                    <p><strong>Purpose:</strong> Contains the core business entities and domain logic. This is the heart
+                        of the application.</p>
+
+                    <h4>Responsibilities:</h4>
+                    <ul>
+                        <li>Define domain entities (User, Conversation, Message, UsageLog)</li>
+                        <li>Define repository interfaces (IUserRepository, IConversationRepository)</li>
+                        <li>Define domain services interfaces</li>
+                        <li>Domain validation rules</li>
+                        <li>Value objects</li>
+                    </ul>
+
+                    <h4>Key Principle:</h4>
+                    <p>⚠️ <strong>No dependencies on any other layer!</strong> The domain is independent and pure.</p>
+
+                    <h4>Example:</h4>
+                    <pre><code>// Domain Entity
+public sealed class User
+{
+    public Guid Id { get; set; }
+    public string Username { get; set; }
+    // ... properties
+    
+    // Domain validation
+    public bool IsQuotaExceeded(int tokensUsed)
+    {
+        return tokensUsed >= DailyTokenQuota;
+    }
+}</code></pre>
+                </div>
+
+                <h3>2. Application Layer (Use Cases)</h3>
+                <div class="card">
+                    <p><strong>Location:</strong> <code>src/Gateway.Application/</code></p>
+                    <p><strong>Purpose:</strong> Orchestrates use cases and business workflows. Coordinates between
+                        domain and infrastructure.</p>
+
+                    <h4>Responsibilities:</h4>
+                    <ul>
+                        <li>Implement business use cases (CreateUser, SendMessage, etc.)</li>
+                        <li>Define DTOs (Data Transfer Objects) for API communication</li>
+                        <li>Input validation using FluentValidation</li>
+                        <li>Service interfaces and implementations</li>
+                        <li>Application-level business rules</li>
+                    </ul>
+
+                    <h4>Dependencies:</h4>
+                    <p>✅ Can depend on: <strong>Domain Layer</strong> only</p>
+
+                    <h4>Example:</h4>
+                    <pre><code>// Application Service
+public class UserService : IUserService
+{
+    private readonly IUserRepository _repository;
+    
+    public async Task&lt;User&gt; CreateUserAsync(string username, string password)
+    {
+        // Use case orchestration
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = username,
+            PasswordHash = BCrypt.HashPassword(password)
+        };
+        
+        return await _repository.AddAsync(user);
+    }
+}</code></pre>
+                </div>
+
+                <h3>3. Infrastructure Layer (External Concerns)</h3>
+                <div class="card">
+                    <p><strong>Location:</strong> <code>src/Gateway.Infrastructure/</code></p>
+                    <p><strong>Purpose:</strong> Implements interfaces defined in Domain. Handles all external
+                        dependencies and I/O.</p>
+
+                    <h4>Responsibilities:</h4>
+                    <ul>
+                        <li>EF Core DbContext and database configuration</li>
+                        <li>Repository implementations (UserRepository, ConversationRepository)</li>
+                        <li>External API clients (LM Studio HTTP client)</li>
+                        <li>File system access</li>
+                        <li>Caching implementations</li>
+                        <li>Encryption and security services</li>
+                    </ul>
+
+                    <h4>Dependencies:</h4>
+                    <p>✅ Can depend on: <strong>Domain Layer</strong></p>
+                    <p>✅ External packages: EF Core, HTTP clients, etc.</p>
+
+                    <h4>Example:</h4>
+                    <pre><code>// Infrastructure Repository
+public class UserRepository : IUserRepository
+{
+    private readonly GatewayDbContext _context;
+    
+    public async Task&lt;User?&gt; GetByIdAsync(Guid id)
+    {
+        return await _context.Users
+            .Include(u => u.Conversations)
+            .FirstOrDefaultAsync(u => u.Id == id);
+    }
+}</code></pre>
+                </div>
+
+                <h3>4. API Layer (HTTP Interface)</h3>
+                <div class="card">
+                    <p><strong>Location:</strong> <code>src/Gateway.Api/</code></p>
+                    <p><strong>Purpose:</strong> HTTP entry point. Maps HTTP requests to application use cases.</p>
+
+                    <h4>Responsibilities:</h4>
+                    <ul>
+                        <li>Define HTTP endpoints (Minimal APIs)</li>
+                        <li>Request/response mapping</li>
+                        <li>Authentication and authorization middleware</li>
+                        <li>CORS configuration</li>
+                        <li>Health checks and metrics endpoints</li>
+                        <li>Dependency Injection configuration</li>
+                        <li>Error handling and Problem Details responses</li>
+                    </ul>
+
+                    <h4>Dependencies:</h4>
+                    <p>✅ Can depend on: <strong>Application, Domain, Infrastructure</strong></p>
+
+                    <h4>Example:</h4>
+                    <pre><code>// API Endpoint
+app.MapPost("/api/users", async (
+    CreateUserRequest request,
+    IUserService userService) =&gt;
+{
+    var user = await userService.CreateUserAsync(
+        request.Username,
+        request.Password);
+        
+    return Results.Ok(new UserResponse(user));
+});</code></pre>
+                </div>
+            </section>
+
+            <!-- Component Interactions -->
+            <section class="section">
+                <h2>Component Interaction Patterns</h2>
+                <p>
+                    Static diagrams show structure, but software is dynamic. To understand how AIGS really works, we
+                    need
+                    to look at how components talk to each other during key operations.
+                </p>
+
+                <h3>Request Flow: User Login</h3>
+                <p>
+                    The login flow demonstrates the interaction between the API, Service, and Repository layers. Note
+                    how
+                    the API layer never touches the database directly; it delegates to the <code>UserService</code>.
+                </p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant Browser
+                    participant API as Gateway.Api
+                    participant UserSvc as UserService
+                    participant UserRepo as UserRepository
+                    participant DB as Database
+                    participant JWT as JwtTokenService
+
+                    Browser->>API: POST /api/auth/login<br />{username, password}
+                    API->>UserSvc: ValidateCredentials(username, password)
+                    UserSvc->>UserRepo: GetUserByUsername(username)
+                    UserRepo->>DB: SELECT * FROM Users WHERE Username=?
+                    DB-->>UserRepo: User data
+                    UserRepo-->>UserSvc: User entity
+                    UserSvc->>UserSvc: BCrypt.Verify(password, user.PasswordHash)
+                    UserSvc-->>API: User validated
+                    API->>JWT: GenerateToken(user)
+                    JWT-->>API: JWT token
+                    API-->>Browser: 200 OK<br />{token, user}<br />Set-Cookie: access_token
+                </div>
+
+                <h3>Request Flow: Send Chat Message</h3>
+                <p>
+                    This is the most complex flow in the system. It involves validating the user, retrieving
+                    conversation
+                    history, streaming the request to the AI model, and then asynchronously saving the result.
+                </p>
+                <p>
+                    The <code>MessageService</code> acts as the coordinator here. It ensures that even if the AI takes
+                    seconds to respond, the user sees immediate feedback via streaming, while the database record is
+                    updated reliably in the background.
+                </p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant Browser
+                    participant API as Gateway.Api
+                    participant MsgSvc as MessageService
+                    participant ConvRepo as ConversationRepo
+                    participant DB as Database
+                    participant LLM as LM Studio Client
+                    participant LMStudio as LM Studio Server
+
+                    Browser->>API: POST /api/chat<br />{messages, conversationId}
+                    API->>API: ValidateJWT() ✓
+                    API->>MsgSvc: SendMessageAsync(messages, convId)
+
+                    alt Conversation exists
+                    MsgSvc->>ConvRepo: GetConversationById(convId)
+                    ConvRepo->>DB: SELECT conversation with messages
+                    DB-->>ConvRepo: Conversation + history
+                    ConvRepo-->>MsgSvc: Conversation
+                    end
+
+                    MsgSvc->>LLM: SendChatRequest(messages)
+                    LLM->>LMStudio: POST /v1/chat/completions
+                    LMStudio-->>LLM: Stream response chunks
+                    LLM-->>MsgSvc: Aggregated response
+
+                    MsgSvc->>DB: INSERT INTO Messages (user_msg, assistant_msg)
+                    MsgSvc->>DB: UPDATE Conversation SET UpdatedAt=NOW()
+                    DB-->>MsgSvc: Success
+
+                    MsgSvc-->>API: Response + tokens + latency
+                    API-->>Browser: 200 OK<br />{choices, usage}
+                </div>
+
+                <h3>Request Flow: Create Conversation</h3>
+                <p>
+                    Creating a conversation is a "write-heavy" operation. It involves creating a new entity, setting
+                    defaults (like the model and category), and logging the action for audit purposes.
+                </p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant Browser
+                    participant API
+                    participant ConvSvc as ConversationService
+                    participant ConvRepo as ConversationRepository
+                    participant DB as Database
+                    participant Audit as AuditService
+
+                    Browser->>API: POST /api/conversations<br />{title, model, category}
+                    API->>API: Extract user from JWT
+                    API->>ConvSvc: CreateConversationAsync(userId, title, model)
+                    ConvSvc->>ConvSvc: Create Conversation entity
+                    ConvSvc->>ConvRepo: AddAsync(conversation)
+                    ConvRepo->>DB: INSERT INTO Conversations
+                    DB-->>ConvRepo: New conversation ID
+                    ConvRepo-->>ConvSvc: Conversation entity
+
+                    ConvSvc->>Audit: LogAction("conversation.created", user, details)
+                    Audit->>DB: INSERT INTO AuditLogs
+
+                    ConvSvc-->>API: Conversation
+                    API-->>Browser: 200 OK<br />{id, title, createdAt, ...}
+                </div>
+            </section>
+
+            <!-- Data Flow -->
+            <section class="section">
+                <h2>Data Flow Architecture</h2>
+                <p>
+                    Understanding how data moves through the system is crucial for performance tuning and debugging.
+                    AIGS
+                    optimizes different paths for different needs: strict validation for writes, efficient querying for
+                    reads, and real-time streaming for AI responses.
+                </p>
+
+                <h3>Write Path (Creating Data)</h3>
+                <p>
+                    When data enters the system (like a new message or user), it must pass through a gauntlet of checks.
+                    We use <strong>FluentValidation</strong> to ensure data integrity before it ever reaches the domain
+                    logic.
+                </p>
+                <div class="mermaid">
+                    graph LR
+                    Client[Browser/Client] -->|HTTP POST/PUT| API[API Endpoint]
+                    API -->|DTO| Validator[FluentValidation]
+                    Validator -->|Valid DTO| Service[Application Service]
+                    Service -->|Domain Entity| Repository[Repository]
+                    Repository -->|EF Core| DbContext[DbContext]
+                    DbContext -->|SQL INSERT/UPDATE| Database[(Database)]
+
+                    Validator -.Invalid.-> API
+                    API -.400 Bad Request.-> Client
+
+                    style Validator fill:#ffc107
+                    style Database fill:#003b57
+                </div>
+
+                <h3>Read Path (Querying Data)</h3>
+                <p>
+                    For reading data, we prioritize speed. While we still use the Repository pattern for consistency,
+                    Entity Framework Core translates our LINQ queries directly into optimized SQL.
+                </p>
+                <div class="mermaid">
+                    graph LR
+                    Client[Browser/Client] -->|HTTP GET| API[API Endpoint]
+                    API -->|Query Params| Service[Application Service]
+                    Service -->|Repository Method| Repository[Repository]
+                    Repository -->|EF Core Query| DbContext[DbContext]
+                    DbContext -->|SQL SELECT| Database[(Database)]
+                    Database -->|Raw Data| DbContext
+                    DbContext -->|Entity| Repository
+                    Repository -->|Entity| Service
+                    Service -->|DTO/Response| API
+                    API -->|JSON Response| Client
+
+                    style Database fill:#003b57
+                </div>
+
+                <h3>Streaming Path (Chat Responses)</h3>
+                <p>
+                    The streaming path is unique. It bypasses the standard request-response cycle to deliver data
+                    chunk-by-chunk. This keeps the UI responsive even when the AI is "thinking" for several seconds.
+                </p>
+                <div class="mermaid">
+                    graph TB
+                    Browser[Browser] -->|WebSocket/SSE| API[API Endpoint]
+                    API -->|Stream Request| MsgSvc[Message Service]
+                    MsgSvc -->|HTTP Streaming| LLMClient[LM Studio Client]
+                    LLMClient -->|OpenAI API| LMStudio[LM Studio Server]
+
+                    LMStudio -.Chunk 1.-> LLMClient
+                    LLMClient -.Chunk 1.-> MsgSvc
+                    MsgSvc -.Chunk 1.-> API
+                    API -.Chunk 1.-> Browser
+
+                    LMStudio -.Chunk 2.-> LLMClient
+                    LLMClient -.Chunk 2.-> MsgSvc
+                    MsgSvc -.Chunk 2.-> API
+                    API -.Chunk 2.-> Browser
+
+                    LMStudio -.Chunk N [DONE].-> LLMClient
+                    LLMClient -.Complete.-> MsgSvc
+                    MsgSvc -->|Save to DB| Database[(Database)]
+
+                    style LMStudio fill:#ff6b6b
+                    style Database fill:#003b57
+                </div>
+            </section>
+
+            <!-- Technology Integration -->
+            <section class="section">
+                <h2>Technology Stack Integration</h2>
+                <p>
+                    AIGS is built on a modern, type-safe stack designed for performance and developer experience. We
+                    don't just pick popular tools; we pick tools that work well <em>together</em>.
+                </p>
+
+                <h3>Frontend Stack</h3>
+                <p>
+                    The frontend is a Single Page Application (SPA) built with React 18. We use Vite for lightning-fast
+                    builds and TypeScript for robust type safety. Tailwind CSS allows us to rapidly build custom designs
+                    without fighting with CSS files.
+                </p>
+                <div class="mermaid">
+                    graph TB
+                    subgraph "Build & Dev Tools"
+                    Vite[Vite<br />Build Tool]
+                    NPM[npm<br />Package Manager]
+                    end
+
+                    subgraph "UI Framework"
+                    React[React 18<br />Component Framework]
+                    TypeScript[TypeScript<br />Type Safety]
+                    end
+
+                    subgraph "Styling"
+                    Tailwind[Tailwind CSS<br />Utility Classes]
+                    CSS[Custom CSS]
+                    end
+
+                    subgraph "State & Routing"
+                    Context[React Context<br />Auth State]
+                    Router[React Router<br />Navigation]
+                    end
+
+                    subgraph "UI Components"
+                    Icons[Lucide Icons]
+                    Components[Custom Components<br />MessageList, ConversationList]
+                    end
+
+                    NPM --> Vite
+                    NPM --> React
+                    NPM --> TypeScript
+                    NPM --> Tailwind
+                    NPM --> Router
+                    NPM --> Icons
+
+                    Vite --> React
+                    React --> Context
+                    React --> Router
+                    React --> Components
+                    Tailwind --> Components
+                    TypeScript --> React
+
+                    style React fill:#61dafb
+                    style TypeScript fill:#3178c6,color:#fff
+                    style Tailwind fill:#06b6d4
+                </div>
+
+                <h3>Backend Stack</h3>
+                <p>
+                    The backend is powered by ASP.NET Core 8, utilizing Minimal APIs for low overhead and high
+                    performance. We use Entity Framework Core as our ORM, allowing us to switch between SQLite (for dev)
+                    and PostgreSQL (for prod) with a single configuration change.
+                </p>
+                <div class="mermaid">
+                    graph TB
+                    subgraph "Runtime & Framework"
+                    NET[.NET 8 Runtime]
+                    ASP[ASP.NET Core<br />Minimal APIs]
+                    end
+
+                    subgraph "Data Access"
+                    EF[Entity Framework Core]
+                    SQLite[SQLite Provider]
+                    Postgres[Npgsql Provider*]
+                    end
+
+                    subgraph "Authentication & Security"
+                    JWT[JWT Bearer Auth]
+                    BCrypt[BCrypt.Net<br />Password Hashing]
+                    end
+
+                    subgraph "Validation & Serialization"
+                    Fluent[FluentValidation]
+                    JSON[System.Text.Json]
+                    end
+
+                    subgraph "External Integration"
+                    HTTP[HttpClient<br />LM Studio]
+                    Health[Health Checks]
+                    Prometheus[Prometheus Metrics]
+                    end
+
+                    NET --> ASP
+                    ASP --> EF
+                    ASP --> JWT
+                    ASP --> HTTP
+                    ASP --> Health
+                    EF --> SQLite
+                    EF -.-> Postgres
+                    ASP --> Fluent
+                    ASP --> JSON
+                    ASP --> BCrypt
+
+                    style NET fill:#512bd4,color:#fff
+                    style EF fill:#512bd4,color:#fff
+                    style SQLite fill:#003b57,color:#fff
+                </div>
+            </section>
+
+            <!-- Security Architecture -->
+            <section class="section">
+                <h2>Security Architecture</h2>
+                <p>
+                    Security isn't an afterthought in AIGS; it's baked into the core. We use industry-standard protocols
+                    to ensure that your data is safe, even when running locally.
+                </p>
+
+                <h3>Authentication Flow</h3>
+                <p>
+                    We use <strong>JWT (JSON Web Tokens)</strong> for stateless authentication. When a user logs in, the
+                    server issues a signed token containing their identity. This token is stored in a secure, HTTP-only
+                    cookie, preventing XSS attacks from stealing it.
+                </p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant User
+                    participant Browser
+                    participant API
+                    participant UserService
+                    participant DB
+                    participant JWTService
+
+                    User->>Browser: Enter credentials
+                    Browser->>API: POST /api/auth/login
+                    API->>UserService: ValidateUser(username, password)
+                    UserService->>DB: GetUserByUsername()
+                    DB-->>UserService: User with PasswordHash
+                    UserService->>UserService: BCrypt.Verify(password, hash)
+
+                    alt Valid Credentials
+                    UserService-->>API: User object
+                    API->>JWTService: GenerateToken(user)
+                    JWTService->>JWTService: Create JWT with claims<br />(userId, username, role)
+                    JWTService->>JWTService: Sign with HMAC-SHA256
+                    JWTService-->>API: JWT Token
+                    API->>API: Set HttpOnly Cookie
+                    API-->>Browser: 200 OK + Set-Cookie
+                    Browser-->>User: Login successful
+                    else Invalid Credentials
+                    UserService-->>API: null
+                    API-->>Browser: 401 Unauthorized
+                    Browser-->>User: Login failed
+                    end
+                </div>
+
+                <h3>Authorization Flow</h3>
+                <p>
+                    Authentication says "who you are"; authorization says "what you can do". Every request passes
+                    through
+                    our Auth Middleware, which validates the token's signature and expiration before the request ever
+                    reaches the endpoint.
+                </p>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant Browser
+                    participant API
+                    participant AuthMiddleware
+                    participant JWTService
+                    participant Endpoint
+
+                    Browser->>API: Request with Cookie
+                    API->>AuthMiddleware: Process Request
+                    AuthMiddleware->>AuthMiddleware: Extract JWT from Cookie
+                    AuthMiddleware->>JWTService: ValidateToken(jwt)
+
+                    alt Valid Token
+                    JWTService->>JWTService: Verify signature
+                    JWTService->>JWTService: Check expiration
+                    JWTService-->>AuthMiddleware: ClaimsPrincipal
+                    AuthMiddleware->>Endpoint: HttpContext with User
+                    Endpoint->>Endpoint: Check role/permissions
+
+                    alt Authorized
+                    Endpoint-->>API: Response data
+                    API-->>Browser: 200 OK
+                    else Forbidden
+                    Endpoint-->>API: Forbidden
+                    API-->>Browser: 403 Forbidden
+                    end
+                    else Invalid Token
+                    JWTService-->>AuthMiddleware: Validation failed
+                    AuthMiddleware-->>API: Unauthorized
+                    API-->>Browser: 401 Unauthorized
+                    end
+                </div>
+
+                <h3>Security Layers</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Protection</th>
+                            <th>Implementation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Transport</strong></td>
+                            <td>HTTPS/TLS</td>
+                            <td>Caddy automatic TLS, nginx with Let's Encrypt</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authentication</strong></td>
+                            <td>JWT Tokens</td>
+                            <td>HMAC-SHA256 signed tokens, 24h expiration</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Passwords</strong></td>
+                            <td>BCrypt Hashing</td>
+                            <td>BCrypt.Net with salt, work factor 11</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authorization</strong></td>
+                            <td>Role-Based Access Control</td>
+                            <td>Admin/User roles, permission checks</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Input Validation</strong></td>
+                            <td>FluentValidation</td>
+                            <td>DTO validation before processing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>CORS</strong></td>
+                            <td>Cross-Origin Protection</td>
+                            <td>Whitelist allowed origins</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Rate Limiting</strong></td>
+                            <td>Request Throttling</td>
+                            <td>Per-user quotas, token limits</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data Encryption</strong></td>
+                            <td>Message Encryption (optional)</td>
+                            <td>AES encryption for sensitive messages</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Scalability -->
+            <section class="section">
+                <h2>Scalability Considerations</h2>
+                <p>
+                    While AIGS is designed to run efficiently on a single machine, we've architected it to grow. The
+                    stateless nature of the API and the separation of the database allow for horizontal scaling when
+                    user
+                    load increases.
+                </p>
+
+                <h3>Horizontal Scaling Pattern</h3>
+                <p>
+                    In a high-load production environment, we can run multiple instances of the API behind a load
+                    balancer. A shared Redis cache handles session state (if needed), and read replicas offload query
+                    traffic from the primary database.
+                </p>
+                <div class="mermaid">
+                    graph TB
+                    LB[Load Balancer<br />nginx/Caddy]
+
+                    LB --> API1[API Instance 1]
+                    LB --> API2[API Instance 2]
+                    LB --> API3[API Instance N]
+
+                    API1 --> Cache[(Redis Cache*<br />Shared Session)]
+                    API2 --> Cache
+                    API3 --> Cache
+
+                    API1 --> DB[(PostgreSQL<br />Primary)]
+                    API2 --> DB
+                    API3 --> DB
+
+                    DB --> Replica1[(Read Replica 1)]
+                    DB --> Replica2[(Read Replica N)]
+
+                    API1 -.Read Queries.-> Replica1
+                    API2 -.Read Queries.-> Replica2
+
+                    style LB fill:#ff9800
+                    style Cache fill:#dc382c,color:#fff
+                    style DB fill:#336791,color:#fff
+                </div>
+
+                <h3>Scaling Strategies</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Bottleneck</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>API Layer</strong></td>
+                            <td>Request throughput</td>
+                            <td>Run multiple API instances behind load balancer</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Database</strong></td>
+                            <td>Read/write contention</td>
+                            <td>PostgreSQL with read replicas, connection pooling</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LM Studio</strong></td>
+                            <td>Inference speed</td>
+                            <td>Multiple LM Studio instances, request queuing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Static Files</strong></td>
+                            <td>File serving</td>
+                            <td>CDN (Cloudflare, etc.) for frontend assets</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Session State</strong></td>
+                            <td>Sticky sessions</td>
+                            <td>Redis for distributed session storage</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert alert-info">
+                    <strong>Current Status:</strong> AIGS is designed for single-server deployments but follows patterns
+                    that enable horizontal scaling when needed.
+                </div>
+            </section>
+
+            <!-- Design Principles -->
+            <section class="section">
+                <h2>Design Principles & Patterns</h2>
+
+                <h3>Core Principles</h3>
+                <ul>
+                    <li><strong>Separation of Concerns</strong> - Each layer has a single, well-defined responsibility
+                    </li>
+                    <li><strong>Dependency Inversion</strong> - High-level modules don't depend on low-level modules;
+                        both depend on abstractions</li>
+                    <li><strong>Single Responsibility</strong> - Each class/module does one thing well</li>
+                    <li><strong>Open/Closed Principle</strong> - Open for extension, closed for modification</li>
+                    <li><strong>Interface Segregation</strong> - Clients shouldn't depend on interfaces they don't use
+                    </li>
+                    <li><strong>Don't Repeat Yourself (DRY)</strong> - Avoid code duplication</li>
+                </ul>
+
+                <h3>Design Patterns Used</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pattern</th>
+                            <th>Where Used</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Repository</strong></td>
+                            <td>Infrastructure layer</td>
+                            <td>Abstract data access, make it testable</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Dependency Injection</strong></td>
+                            <td>Throughout application</td>
+                            <td>Loose coupling, testability, flexibility</td>
+                        </tr>
+                        <tr>
+                            <td><strong>DTO (Data Transfer Object)</strong></td>
+                            <td>Application layer</td>
+                            <td>Decouple API contracts from domain entities</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Service Layer</strong></td>
+                            <td>Application layer</td>
+                            <td>Orchestrate business logic and workflows</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Factory</strong></td>
+                            <td>JWT token service</td>
+                            <td>Encapsulate object creation logic</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Strategy</strong></td>
+                            <td>Validation, encryption</td>
+                            <td>Swap algorithms at runtime</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Middleware Pipeline</strong></td>
+                            <td>ASP.NET Core</td>
+                            <td>Chain of responsibility for request processing</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Error Handling -->
+            <section class="section">
+                <h2>Error Handling Architecture</h2>
+                <p>
+                    Errors are inevitable, but how we handle them defines the user experience. AIGS uses a centralized
+                    error handling strategy that catches exceptions at the API boundary and converts them into
+                    standardized
+                    Problem Details responses (RFC 7807).
+                </p>
+
+                <h3>Error Flow</h3>
+                <p>
+                    Whether it's a validation error, a database conflict, or an unexpected crash, the flow ensures that
+                    the client always receives a valid JSON response, never a raw HTML stack trace.
+                </p>
+                <div class="mermaid">
+                    graph TB
+                    Request[HTTP Request] --> API[API Endpoint]
+                    API --> Validation{Input<br />Validation}
+
+                    Validation -->|Invalid| BadRequest[400 Bad Request<br />Problem Details]
+                    Validation -->|Valid| Auth{Auth<br />Check}
+
+                    Auth -->|Unauthorized| Unauth[401 Unauthorized]
+                    Auth -->|Authorized| Business[Business Logic]
+
+                    Business --> DBOp{Database<br />Operation}
+                    DBOp -->|Not Found| NotFound[404 Not Found]
+                    DBOp -->|Conflict| Conflict[409 Conflict]
+                    DBOp -->|Success| Success[200 OK<br />Response Data]
+                    DBOp -->|Error| ServerError[500 Internal Error<br />Logged]
+
+                    BadRequest --> Client[Client]
+                    Unauth --> Client
+                    NotFound --> Client
+                    Conflict --> Client
+                    Success --> Client
+                    ServerError --> Client
+
+                    style BadRequest fill:#ff9800
+                    style Unauth fill:#f44336,color:#fff
+                    style NotFound fill:#ff9800
+                    style Success fill:#4caf50,color:#fff
+                    style ServerError fill:#f44336,color:#fff
+                </div>
+
+                <h3>Error Response Format (RFC 7807 Problem Details)</h3>
+                <pre><code>{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Conversation with ID 'abc-123' was not found",
+  "instance": "/api/conversations/abc-123",
+  "errors": {
+    "id": ["The conversation does not exist or you don't have access"]
+  }
+}</code></pre>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="domain-models.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🗄️ Domain Models</div>
+                        <p class="card-description">Dive into the entities that form the core of this architecture.</p>
+                    </a>
+
+                    <a href="api-reference.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📡 API Reference</div>
+                        <p class="card-description">See how these architectural patterns translate to HTTP endpoints.
+                        </p>
+                    </a>
+
+                    <a href="development.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">💻 Development Guide</div>
+                        <p class="card-description">Learn how to work with this architecture in practice.</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

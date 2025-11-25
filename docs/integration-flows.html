@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Integration Flows Deep Dive</title>
+    <meta name="description"
+        content="End-to-end tracing of user journeys through the AIGS system - authentication, chat, conversation management">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="integration-flows.html" class="nav-link active">Integration Flows</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <a href="architecture.html">Architecture</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Integration Flows</span>
+            </div>
+
+            <h1>Integration Flows - End-to-End User Journeys</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                Understanding how individual components work is important, but the real magic happens when all the
+                pieces work together. This chapter traces complete user journeys from start to finish - what happens
+                when you click "Login"? How does a message travel from your keyboard to the AI and back? By following
+                the data flow through every layer, you'll gain a deep understanding of how AIGS operates as a cohesive
+                system.
+            </p>
+
+            <!-- INTRODUCTION -->
+            <section class="section">
+                <h2>What is an End-to-End Flow?</h2>
+
+                <p>
+                    An end-to-end flow traces a single user action through the entire system. It shows every component
+                    that gets involved, the order they execute in, and the data transformations that happen along the
+                    way. Think of it like following a letter through the postal system - from the moment you drop it in
+                    the mailbox, through sorting facilities, delivery trucks, and finally to the recipient's door.
+                </p>
+
+                <p>
+                    In software, a flow typically follows this pattern:
+                </p>
+
+                <ol>
+                    <li><strong>User Action</strong> - Click button, type input, submit form</li>
+                    <li><strong>Frontend Processing</strong> - Validate input, show loading state</li>
+                    <li><strong>HTTP Request</strong> - Send data to backend API</li>
+                    <li><strong>Backend Routing</strong> - API endpoint receives request</li>
+                    <li><strong>Authentication/Authorization</strong> - Verify identity and permissions</li>
+                    <li><strong>Business Logic</strong> - Application services process the request</li>
+                    <li><strong>Data Access</strong> - Read/write database</li>
+                    <li><strong>Response Formation</strong> - Transform data to DTO</li>
+                    <li><strong>HTTP Response</strong> - Send result back to frontend</li>
+                    <li><strong>Frontend Update</strong> - Display result to user</li>
+                </ol>
+
+                <h3>Reading Sequence Diagrams</h3>
+                <p>
+                    This chapter uses sequence diagrams to visualize flows. Here's how to read them:
+                </p>
+
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant A as Component A
+                    participant B as Component B
+                    participant C as Component C
+
+                    Note over A: User clicks button
+                    A->>B: Request (solid arrow = sync call)
+                    activate B
+                    Note over B: Processing...
+                    B-->>A: Response (dashed arrow = return)
+                    deactivate B
+
+                    A->>C: Another Request
+                    C-->>A: Another Response
+                </div>
+
+                <ul>
+                    <li><strong>Boxes at top</strong> - Components/layers (Frontend, Backend, Database, etc.)</li>
+                    <li><strong>Solid arrows (→)</strong> - Method calls, HTTP requests</li>
+                    <li><strong>Dashed arrows (⇢)</strong> - Returns, responses</li>
+                    <li><strong>Yellow boxes</strong> - Notes explaining what's happening</li>
+                    <li><strong>Time flows downward</strong> - Top events happen first, bottom events happen last</li>
+                </ul>
+            </section>
+
+            <!-- FLOW 1: USER REGISTRATION -->
+            <section class="section">
+                <h2>Flow 1: User Registration</h2>
+
+                <h3>The User's Perspective</h3>
+                <p>
+                    You visit AIGS for the first time and click "Sign Up". You enter a username, password, and email,
+                    then click "Register". A moment later, you either see a success message or an error (like "username
+                    already exists"). Simple, right? Let's see what happens behind the scenes.
+                </p>
+
+                <h3>Complete Registration Sequence</h3>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant User
+                    participant Browser as Browser<br />(React)
+                    participant API as Backend API
+                    participant UserSvc as User Service
+                    participant BCrypt
+                    participant UserRepo as User Repository
+                    participant DB as Database
+
+                    User->>Browser: Fill registration form
+                    User->>Browser: Click "Register"
+
+                    Note over Browser: Validate input<br />(length, format)
+
+                    Browser->>API: POST /api/auth/register<br />{username, password, email}
+
+                    Note over API: Route to auth endpoint
+
+                    API->>UserSvc: CreateUserAsync(username, password, email)
+
+                    UserSvc->>UserRepo: GetUserByUsername(username)
+                    UserRepo->>DB: SELECT * FROM Users WHERE Username=?
+                    DB-->>UserRepo: null (user doesn't exist)
+                    UserRepo-->>UserSvc: null
+
+                    Note over UserSvc: Username is available ✓
+
+                    UserSvc->>BCrypt: HashPassword(password)
+                    Note over BCrypt: Generate salt<br />Hash with bcrypt algorithm
+                    BCrypt-->>UserSvc: $2a$11$[hash]
+
+                    UserSvc->>UserSvc: Create User entity<br />Id = Guid.NewGuid()<br />PasswordHash = [hash]
+
+                    UserSvc->>UserRepo: CreateAsync(user)
+                    UserRepo->>DB: INSERT INTO Users<br />(Id, Username, PasswordHash, Email, CreatedAt)
+                    DB-->>UserRepo: Success (1 row inserted)
+                    UserRepo-->>UserSvc: User entity
+
+                    UserSvc-->>API: User created
+
+                    Note over API: Map to DTO<br />(don't send password hash!)
+
+                    API-->>Browser: 200 OK<br />{success: true, user: {id, username, email}}
+
+                    Browser->>Browser: Redirect to login page
+                    Browser-->>User: "Registration successful!"
+                </div>
+
+                <h3>Step-by-Step Explanation</h3>
+                <p>
+                    Let's break down exactly what happens at each stage of the registration process. This isn't just
+                    about
+                    saving data; it's about ensuring security and data integrity from the very first interaction.
+                </p>
+
+                <h4>1. Frontend Validation (Lines 1-5)</h4>
+                <p>
+                    Before sending anything to the server, the React form validates the input. This provides immediate
+                    feedback to the user and saves server resources. We check that the username is 3-50 characters long
+                    and alphanumeric, the password meets complexity requirements (min 8 chars), and the email looks like
+                    a valid email address.
+                </p>
+
+                <h4>2. HTTP Request (Line 6)</h4>
+                <p>
+                    Once validation passes, the browser sends a POST request to <code>/api/auth/register</code>. The
+                    payload is a standard JSON object containing the user's credentials.
+                </p>
+                <pre><code>{
+  "username": "alice",
+  "password": "securepassword123",
+  "email": "alice@example.com"
+}</code></pre>
+
+                <h4>3. Duplicate Check (Lines 8-13)</h4>
+                <p>
+                    Uniqueness is key. The User Service first queries the database to ensure the username doesn't
+                    already exist. This prevents collisions and ensures every user has a unique identity. If a match is
+                    found, we abort immediately with a 409 Conflict error.
+                </p>
+
+                <h4>4. Password Hashing (Lines 15-18)</h4>
+                <p>
+                    Security is paramount here. We <strong>never</strong> store passwords in plain text. Instead, we use
+                    BCrypt, a robust hashing algorithm. BCrypt generates a random "salt" and combines it with the
+                    password before hashing. This means that even if two users have the same password, their stored
+                    hashes will be completely different.
+                </p>
+                <p>
+                    The result looks like: <code>$2a$11$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy</code>.
+                    This hash is what gets saved to the database.
+                </p>
+
+                <h4>5. Database Insertion (Lines 20-24)</h4>
+                <p>
+                    With the password safely hashed, we create a new <code>User</code> entity. We assign it a unique
+                    GUID and set the creation timestamp. This entity is then persisted to the <code>Users</code> table
+                    via Entity Framework Core.
+                </p>
+
+                <h4>6. Response and Redirect (Lines 26-30)</h4>
+                <p>
+                    Finally, the API returns a success response. Crucially, this response includes the user's
+                    non-sensitive
+                    details (ID, username, email) but <strong>never</strong> the password or hash. The frontend receives
+                    this, shows a success message, and redirects the user to the login page to start their first
+                    session.
+                </p>
+            </section>
+
+            <!-- FLOW 2: USER LOGIN -->
+            <section class="section">
+                <h2>Flow 2: User Login & Authentication</h2>
+
+                <h3>The User's Perspective</h3>
+                <p>
+                    You enter your username and password, click "Login", and if credentials are correct, you're taken to
+                    the chat interface. The app "remembers" you're logged in even if you refresh the page. How does this
+                    work?
+                </p>
+
+                <h3>Complete Login Sequence</h3>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant User
+                    participant Browser
+                    participant API
+                    participant UserSvc as User Service
+                    participant DB as Database
+                    participant BCrypt
+                    participant JWT as JWT Service
+
+                    User->>Browser: Enter username & password
+                    User->>Browser: Click "Login"
+
+                    Browser->>API: POST /api/auth/login<br />{username, password}
+
+                    API->>UserSvc: ValidateCredentials(username, password)
+
+                    UserSvc->>DB: GetUserByUsername(username)
+                    DB-->>UserSvc: User entity (with PasswordHash)
+
+                    UserSvc->>BCrypt: Verify(password, user.PasswordHash)
+                    Note over BCrypt: Hash provided password<br />with stored salt<br />Compare hashes
+
+                    alt Password correct
+                    BCrypt-->>UserSvc: true
+                    UserSvc-->>API: User validated ✓
+
+                    API->>JWT: GenerateToken(user)
+                    Note over JWT: Create JWT with claims:<br />- userId<br />- username<br />- role<br />- expiration
+                    JWT->>JWT: Sign with secret key
+                    JWT-->>API: "eyJhbGc...token"
+
+                    Note over API: Set HTTP-only cookie<br />Name: access_token<br />Value: JWT<br />Secure:
+                    true<br />SameSite: Strict
+
+                    API-->>Browser: 200 OK<br />{success: true, user: {...}}<br />+ Set-Cookie header
+
+                    Browser->>Browser: Store cookie<br />(automatic)
+                    Browser->>Browser: Update AuthContext<br />setUser(userData)
+                    Browser->>Browser: Navigate to /chat
+                    Browser-->>User: "Welcome back!"
+                    else Password incorrect
+                    BCrypt-->>UserSvc: false
+                    UserSvc-->>API: null
+                    API-->>Browser: 401 Unauthorized<br />{success: false, message: "Invalid credentials"}
+                    Browser-->>User: "Login failed"
+                    end
+                </div>
+
+                <h3>JWT Token Structure</h3>
+                <p>
+                    Authentication in AIGS relies on JSON Web Tokens (JWTs). A JWT is a compact, URL-safe means of
+                    representing claims to be transferred between two parties. It allows the server to verify the user's
+                    identity without checking the database on every single request.
+                </p>
+                <p>
+                    The token consists of three parts separated by dots:
+                </p>
+
+                <pre><code>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9  ← Header (algorithm & type)
+.
+eyJ1c2VySWQiOiIxMjM0NSIsInVzZXJuYW1lIjoiYWxpY2UiLCJyb2xlIjoiVXNlciIsImV4cCI6MTcwMDAwMDAwMH0  ← Payload (claims)
+.
+SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c  ← Signature (proves authenticity)</code></pre>
+
+                <p>
+                    The <strong>Payload</strong> is the most interesting part. It contains the "claims" - statements
+                    about the user (like their ID and role) and metadata (like when the token expires).
+                </p>
+
+                <pre><code>{
+  "userId": "12345",
+  "username": "alice",
+  "role": "User",
+  "exp": 1700000000  // Expiration timestamp
+}</code></pre>
+
+                <h3>How the Cookie Persists Authentication</h3>
+                <p>
+                    We store the JWT in an <strong>HTTP-only cookie</strong>. This is a crucial security decision.
+                    Unlike
+                    localStorage, HTTP-only cookies cannot be accessed by JavaScript running in the browser. This makes
+                    it impossible for malicious scripts (XSS attacks) to steal the user's token.
+                </p>
+
+                <p>
+                    The flow for persistent authentication works like this:
+                </p>
+
+                <ol>
+                    <li><strong>Automatic Transmission</strong> - The browser automatically sends the cookie with every
+                        request to the API.</li>
+                    <li><strong>Server Verification</strong> - The backend middleware intercepts the request, reads the
+                        cookie, validates the signature, and sets the <code>User</code> principal.</li>
+                    <li><strong>Client-Side State</strong> - On the frontend, we can't read the cookie directly, but we
+                        can infer the user's state by making a request to a <code>/me</code> endpoint or by decoding a
+                        separate non-HTTP-only cookie if we implemented a dual-cookie pattern (AIGS uses the standard
+                        pattern where the frontend checks auth status on load).
+                    </li>
+                </ol>
+            </section>
+
+            <!-- FLOW 3: STREAMING CHAT MESSAGE -->
+            <section class="section">
+                <h2>Flow 3: Sending a Chat Message (with Streaming)</h2>
+
+                <h3>The User's Perspective</h3>
+                <p>
+                    You type a message in the chat input and press Enter. Your message appears immediately in the chat.
+                    A moment later, the AI's response begins appearing character-by-character, as if the AI is "typing".
+                    Eventually the response completes and both messages are saved to the conversation history.
+                </p>
+
+                <h3>Complete Chat Flow</h3>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant User
+                    participant Browser
+                    participant API
+                    participant Conv as Conversation<br />Service
+                    participant LLM as LM Studio<br />Client
+                    participant Studio as LM Studio<br />Server
+                    participant Enc as Encryption<br />Service
+                    participant DB as Database
+
+                    User->>Browser: Type message & press Enter
+
+                    Note over Browser: Add user message<br />to UI immediately<br />(optimistic update)
+                    Browser->>Browser: Display user bubble
+
+                    Note over Browser: Create empty assistant<br />message for streaming
+                    Browser->>Browser: Display empty AI bubble
+
+                    Browser->>API: POST /api/chat<br />{messages: [...history, userMsg],<br />conversationId: "abc123"}
+
+                    Note over API: Validate JWT token<br />Extract userId
+
+                    API->>Conv: GetConversationWithMessages(convId, userId)
+                    Conv->>DB: SELECT conversation + messages
+                    DB-->>Conv: Conversation with encrypted messages
+
+                    Note over Conv: Decrypt each message<br />for context
+                    Conv->>Enc: DecryptMessage(encryptedContent)
+                    Enc-->>Conv: Decrypted content
+                    Conv-->>API: Conversation history (decrypted)
+
+                    Note over API: Build prompt with history
+
+                    API->>LLM: ChatCompletionStreamAsync(request)
+                    LLM->>Studio: POST /v1/chat/completions<br />{messages, stream: true}
+
+                    Note over Studio: Generate response<br />token by token
+
+                    loop Streaming chunks
+                    Studio-->>LLM: data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n
+                    LLM-->>API: Stream chunk
+                    API-->>Browser: SSE: data: Hello\n\n
+
+                    Note over Browser: Append to assistant<br />message in UI
+                    Browser->>Browser: message.content += "Hello"
+                    Browser-->>User: Shows "Hello" (animated)
+
+                    Studio-->>LLM: data: {"choices":[{"delta":{"content":" there"}}]}\n\n
+                    LLM-->>API: Stream chunk
+                    API-->>Browser: SSE: data: there\n\n
+                    Browser->>Browser: message.content += " there"
+                    Browser-->>User: Shows "Hello there"
+                    end
+
+                    Studio-->>LLM: data: [DONE]\n\n
+                    LLM-->>API: Stream complete
+
+                    Note over API: Full response received
+
+                    API->>Enc: EncryptMessage(userMessage, userId)
+                    Enc-->>API: Encrypted user message
+
+                    API->>Enc: EncryptMessage(assistantResponse, userId)
+                    Enc-->>API: Encrypted assistant message
+
+                    API->>DB: INSERT INTO Messages (conversationId, role, content)<br />VALUES (..., 'user',
+                    encrypted1),<br /> (..., 'assistant', encrypted2)
+                    DB-->>API: Success
+
+                    API->>DB: UPDATE Conversations SET UpdatedAt=NOW()
+
+                    API-->>Browser: 200 OK<br />{usage: {totalTokens: 150}}
+
+                    Note over Browser: Messages already<br />displayed via streaming
+                    Browser-->>User: Complete conversation visible
+                </div>
+
+                <h3>Server-Sent Events (SSE) Format</h3>
+                <p>
+                    To achieve the "typing" effect, we use Server-Sent Events (SSE). Unlike standard HTTP requests where
+                    you wait for the full response, SSE allows the server to push data chunks to the client as they
+                    become available.
+                </p>
+                <p>
+                    The raw stream looks like a series of text blocks, each prefixed with <code>data:</code>. The
+                    browser
+                    reads these blocks one by one.
+                </p>
+
+                <pre><code>data: {"choices":[{"delta":{"content":"Hello"}}],"model":"llama-3.1"}
+
+data: {"choices":[{"delta":{"content":" there"}}],"model":"..." }
+
+data: {"choices":[{"delta":{"content":"!"}}]}
+
+data: [DONE]
+</code></pre>
+
+                <p>
+                    The frontend's <code>ReadableStream</code> API processes this stream. As each chunk arrives, we
+                    extract the new text content and append it to the current message in the React state. This triggers
+                    a re-render, causing the text to appear on screen instantly.
+                </p>
+
+                <h3>Why Encrypt After Streaming?</h3>
+                <p>
+                    You might notice in the diagram that encryption happens <em>after</em> the streaming is complete.
+                    Why? Because LM Studio needs the raw, unencrypted text to understand your prompt and generate a
+                    response. We can't send encrypted gibberish to the AI!
+                </p>
+                <p>
+                    Therefore, the flow is:
+                    1. Decrypt history for the AI context.
+                    2. Stream the plain text response to the user (over the secure localhost connection).
+                    3. Once complete, encrypt the full message and save it to the database.
+                    This ensures that while the active session is processing data in memory, the persistent storage
+                    remains
+                    securely encrypted at rest.
+                </p>
+            </section>
+
+            <!-- FLOW 4: CONVERSATION MANAGEMENT -->
+            <section class="section">
+                <h2>Flow 4: Creating a New Conversation</h2>
+
+                <h3>The User's Perspective</h3>
+                <p>
+                    You click "New Chat" button. The conversation list updates to show a new entry titled "New
+                    Conversation", and you're presented with an empty chat interface ready for your first message.
+                </p>
+
+                <h3>New Conversation Sequence</h3>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant User
+                    participant Browser
+                    participant API
+                    participant ConvSvc as Conversation<br />Service
+                    participant DB
+
+                    User->>Browser: Click "New Chat" button
+
+                    Browser->>API: POST /api/conversations<br />{title: "New Conversation",<br />model:
+                    "llama-3.1-8b",<br />category: "General"}
+
+                    Note over API: Extract userId from JWT
+
+                    API->>ConvSvc: CreateConversationAsync(userId, title, model, category)
+
+                    ConvSvc->>ConvSvc: Create Conversation entity<br />Id = Guid.NewGuid()<br />UserId =
+                    userId<br />CreatedAt = DateTime.UtcNow
+
+                    ConvSvc->>DB: INSERT INTO Conversations<br />(Id, UserId, Title, Model, Category, CreatedAt,
+                    UpdatedAt)
+                    DB-->>ConvSvc: Success
+
+                    Note over ConvSvc: Convert to DTO
+
+                    ConvSvc-->>API: ConversationResponse DTO
+
+                    API-->>Browser: 200 OK<br />{id: "new-guid", title: "New Conversation", ...}
+
+                    Browser->>Browser: Add to conversations list
+                    Browser->>Browser: Navigate to new conversation
+                    Browser->>Browser: Clear message history
+
+                    Browser-->>User: Empty chat ready
+                </div>
+
+                <h3>Conversation List Update</h3>
+                <p>
+                    The React component maintains a state array of conversations. When the API returns the new
+                    conversation, it's added to this array:
+                </p>
+
+                <pre><code>const handleNewConversation = async () => {
+  const response = await api.createConversation({
+    title: "New Conversation",
+    model: selectedModel,
+    category: "General"
+  });
+  
+  if (response.id) {
+    // Add to state
+    setConversations([response, ...conversations]);
+    
+    // Select it
+    setCurrentConversation(response);
+    
+    // Clear messages
+    setMessages([]);
+  }
+};</code></pre>
+            </section>
+
+            <!-- FLOW 5: ERROR HANDLING -->
+            <section class="section">
+                <h2>Flow 5: Error Handling Across Layers</h2>
+                <p>
+                    In a perfect world, networks never fail and users never make mistakes. In reality, error handling is
+                    half the code. AIGS implements a robust error handling strategy that spans from the frontend UI down
+                    to the database, ensuring that when things go wrong, they fail gracefully and informatively.
+                </p>
+
+                <h3>Network Error Example</h3>
+                <p>
+                    What happens if the backend is down or the network connection fails? The frontend is designed to
+                    handle this without crashing. Let's trace an error scenario:
+                </p>
+
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant User
+                    participant Browser
+                    participant API as Backend API<br />(Offline!)
+
+                    User->>Browser: Send chat message
+                    Browser->>Browser: Show loading spinner
+
+                    Browser->>API: POST /api/chat
+
+                    Note over Browser,API: Network timeout<br />(no response)
+
+                    Browser->>Browser: fetch() throws error
+                    Browser->>Browser: catch(error)
+
+                    Note over Browser: Log error to console
+                    Browser->>Browser: console.error(error)
+
+                    Note over Browser: Remove loading spinner
+                    Note over Browser: Show error to user
+
+                    Browser-->>User: ❌ "Failed to send message.<br />Please check your connection."
+
+                    Note over Browser: Optionally: Remove<br />unsent message from UI
+                </div>
+
+                <h3>Validation Error Example</h3>
+                <p>
+                    If the backend receives invalid data (e.g., an empty message), it shouldn't just crash or save bad
+                    data. It returns a structured validation error. AIGS uses FluentValidation to ensure all requests
+                    meet the required criteria before processing begins.
+                </p>
+
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant Browser
+                    participant API
+                    participant Validator as FluentValidation
+
+                    Browser->>API: POST /api/chat<br />{messages: [], conversationId: null}
+
+                    API->>Validator: Validate(request)
+                    Validator-->>API: ValidationResult.Errors:<br />["messages cannot be empty"]
+
+                    Note over API: Return 400 Bad Request
+
+                    API-->>Browser: 400 Bad Request<br />{errors: {messages: ["cannot be empty"]}}
+
+                    Note over Browser: Display validation errors<br />under input field
+
+                    Browser-->>User: Shows red error text
+                </div>
+
+                <h3>Error Handling Best Practices</h3>
+                <div class="card">
+                    <div class="card-title">🛡️ Error Handling Strategy</div>
+                    <p>
+                        Our approach to error handling is built on five pillars:
+                    </p>
+                    <ul>
+                        <li><strong>Optimistic UI Updates</strong> - We assume success and show the user message
+                            immediately.
+                            If it fails, we roll back the UI state and show an error. This makes the app feel faster.
+                        </li>
+                        <li><strong>Clear Error Messages</strong> - We translate technical errors (like "500 Internal
+                            Server Error")
+                            into human-readable messages (like "Something went wrong on our end").</li>
+                        <li><strong>Retry Mechanisms</strong> - For transient network issues, we allow the user to
+                            easily
+                            retry the action.</li>
+                        <li><strong>Logging</strong> - All errors are logged to the console (in development) or a
+                            logging
+                            service (in production) to help developers diagnose issues.</li>
+                        <li><strong>Graceful Degradation</strong> - If a non-critical service (like the avatar
+                            generator)
+                            fails, the rest of the app keeps working.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- COMPLETE ROUNDTRIP -->
+            <section class="section">
+                <h2>The Complete Round Trip</h2>
+
+                <h3>Putting It All Together</h3>
+                <p>
+                    Let's trace a complete user session from start to finish, showing how all the flows connect:
+                </p>
+
+                <div class="mermaid">
+                    graph TB
+                    Start([User opens AIGS])
+
+                    CheckAuth{Has valid<br />JWT cookie?}
+
+                    Login[Flow 1: Login]
+                    LoadConvs[Load conversations list]
+                    SelectConv{Select existing<br />or new?}
+
+                    NewConv[Flow 4: Create New Conversation]
+                    LoadMsgs[Load existing messages]
+
+                    ChatReady[Chat interface ready]
+                    TypeMsg[User types message]
+
+                    SendMsg[Flow 3: Send Message<br />with Streaming]
+
+                    DisplayResp[Display AI response]
+
+                    Continue{Another<br />message?}
+
+                    Logout[User logs out]
+                    End([Session ends])
+
+                    Start --> CheckAuth
+                    CheckAuth -->|No| Login
+                    CheckAuth -->|Yes| LoadConvs
+                    Login --> LoadConvs
+
+                    LoadConvs --> SelectConv
+                    SelectConv -->|New| NewConv
+                    SelectConv -->|Existing| LoadMsgs
+
+                    NewConv --> ChatReady
+                    LoadMsgs --> ChatReady
+
+                    ChatReady --> TypeMsg
+                    TypeMsg --> SendMsg
+                    SendMsg --> DisplayResp
+                    DisplayResp --> Continue
+
+                    Continue -->|Yes| TypeMsg
+                    Continue -->|No| Logout
+                    Logout --> End
+
+                    style Start fill:#4caf50,color:#fff
+                    style Login fill:#2196f3,color:#fff
+                    style SendMsg fill:#ff9800,color:#fff
+                    style End fill:#f44336,color:#fff
+                </div>
+
+                <p>
+                    Every time you use AIGS, you're following paths through this flow diagram. Understanding these flows
+                    helps you debug issues, add features, and appreciate the architecture's elegance.
+                </p>
+            </section>
+
+            <!-- NEXT STEPS -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="architecture.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🏗️ Architecture Overview</div>
+                        <p class="card-description">Return to the architecture hub to explore other components and
+                            layers</p>
+                    </a>
+
+                    <a href="api-reference.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📡 API Reference</div>
+                        <p class="card-description">Detailed endpoint documentation for all HTTP APIs</p>
+                    </a>
+
+                    <a href="frontend.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">⚛️ Frontend Architecture</div>
+                        <p class="card-description">Deep dive into React components and state management</p>
+                    </a>
+
+                    <a href="infrastructure-layer.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🔧 Infrastructure Layer</div>
+                        <p class="card-description">Database access, repositories, and external services</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite. Built with ❤️ for local-first AI.</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

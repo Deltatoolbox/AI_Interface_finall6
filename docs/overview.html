@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Project Overview</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link active">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+            <a href="development.html" class="nav-link">Development</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/ </span>
+                <span>Overview</span>
+            </div>
+
+            <h1>Project Overview</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                AIGS (AI Gateway Suite) is a comprehensive, locally runnable AI platform that combines a modern React
+                frontend with a robust ASP.NET Core backend, seamlessly integrating with LM Studio for local AI
+                inference.
+            </p>
+
+            <!-- What is AIGS -->
+            <section class="section">
+                <h2>What is AIGS?</h2>
+                <p>
+                    In an era where artificial intelligence is transforming how we work and interact with technology,
+                    most AI solutions require sending your data to third-party cloud services. AIGS takes a different
+                    approach: it's a complete AI gateway solution designed for <strong>local-first deployments</strong>,
+                    meaning your data never leaves your infrastructure. Whether you're a privacy-conscious individual,
+                    a company with strict data governance requirements, or simply someone who wants to experiment with
+                    AI without recurring cloud costs, AIGS provides everything you need to run a production-grade AI
+                    chat system entirely on your own hardware.
+                </p>
+                <p>
+                    Think of AIGS as your personal ChatGPT, but one that respects your privacy, runs on your machine,
+                    and gives you complete control over your conversations and data. It provides a full-featured chat
+                    interface with all the modern conveniences you'd expect: real-time streaming responses, organized
+                    conversation management, collaborative features like conversation sharing, and enterprise-grade
+                    security including user authentication, role-based access control, and optional end-to-end
+                    encryption.
+                </p>
+                <p>
+                    At its core, AIGS integrates seamlessly with LM Studio's OpenAI-compatible API. This means you can
+                    run powerful open-source language models (like Llama, Mistral, or any model supported by LM Studio)
+                    directly on your laptop or server, and interact with them through a polished web interface that
+                    feels just as professional as any commercial offering.
+                </p>
+                <p>
+                    The project offers two deployment modes to fit different use cases, from quick personal setups to
+                    enterprise-scale deployments:
+                </p>
+                <ul>
+                    <li><strong>SimpleGateway</strong> - A monolithic, all-in-one application that combines the entire
+                        stack into a single executable. Perfect for quick deployments, local development, and scenarios
+                        where simplicity and ease of use trump architectural complexity. You can have AIGS up and
+                        running in under 5 minutes with just a few shell commands.</li>
+                    <li><strong>Layered Architecture</strong> - A clean architecture implementation with separate Api,
+                        Application, Domain, and Infrastructure layers. This approach follows enterprise best practices
+                        and is ideal when you need testability, scalability, team collaboration, or plan to customize
+                        and extend the system significantly. Each layer is independent and can be tested, modified, or
+                        even swapped out without affecting the others.</li>
+                </ul>
+                <p>
+                    What truly sets AIGS apart is its completeness. This isn't just a proof-of-concept or a minimal
+                    example - it's a full-featured platform with user management, conversation organization, chat
+                    templates, audit logging, webhook integrations, automated backups, and comprehensive monitoring. You
+                    get all the polish and features of a commercial SaaS product, but running entirely under your
+                    control.
+                </p>
+            </section>
+
+            <!-- Key Features -->
+            <section class="section">
+                <h2>Key Features</h2>
+                <p>
+                    AIGS isn't just another chat interface - it's a comprehensive platform that brings together
+                    everything you need for professional AI deployments. From the moment you start your first
+                    conversation, you'll notice the attention to detail: streaming responses that appear character-by-
+                    character just like commercial services, conversation organization that scales from a handful to
+                    thousands of chats, and a security model robust enough for enterprise use yet simple enough for
+                    personal projects.
+                </p>
+                <p>
+                    Let's explore what makes AIGS a complete solution. Each feature has been designed not just to work,
+                    but to work well - with edge cases handled, errors caught gracefully, and user experience polished.
+                    Whether you're a solo developer running AIGS on your laptop or an organization deploying it for
+                    your team, these features provide the foundation for serious AI work:
+                </p>
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-title">💬 Real-time Chat</div>
+                        <p class="card-description">Stream responses from LM Studio with full OpenAI API compatibility.
+                            Support for multiple models and conversation contexts.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔐 Secure Authentication</div>
+                        <p class="card-description">JWT-based auth with HTTP-only cookies, password hashing with BCrypt,
+                            and role-based access control (Admin/User).</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📝 Conversation Management</div>
+                        <p class="card-description">Organize chats into conversations, rename, delete, and search
+                            through chat history. Full CRUD operations with ownership validation.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🎯 Chat Templates</div>
+                        <p class="card-description">Pre-built prompts for common tasks like code review, brainstorming,
+                            and more. Customizable templates with system messages.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">👥 User Management</div>
+                        <p class="card-description">Admin dashboard for user CRUD, role assignment, password resets, and
+                            user statistics.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">📊 Monitoring & Metrics</div>
+                        <p class="card-description">Health check endpoints, Prometheus metrics, audit logging, and usage
+                            tracking.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🔌 Webhooks & Integrations</div>
+                        <p class="card-description">Plugin system with built-in Slack and Discord integrations. Trigger
+                            webhooks on events like user creation and chat messages.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🛡️ Privacy & Security</div>
+                        <p class="card-description">Optional message encryption, GDPR compliance features, data export,
+                            and right-to-deletion.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">💾 Backup & Restore</div>
+                        <p class="card-description">Automated database backups, conversation export/import, and data
+                            portability.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🎨 Modern UI</div>
+                        <p class="card-description">React + TypeScript with Tailwind CSS, dark mode support, responsive
+                            design, and intuitive UX.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section class="section">
+                <h2>Quick Start</h2>
+                <p>
+                    Getting started with AIGS is designed to be as frictionless as possible. We understand that setting
+                    up a complex AI environment can often be a headache of dependencies and configurations. That's why
+                    we've streamlined the process into two distinct paths. Whether you just want to try it out in a few
+                    minutes or you're setting up a robust development environment, we have a path for you.
+                </p>
+                <p>
+                    Before you begin, you'll need a few standard tools installed. These are the foundational building
+                    blocks that AIGS relies on to run efficiently on your local machine:
+                </p>
+
+                <h3>Prerequisites</h3>
+                <ul>
+                    <li><strong>.NET 8 SDK</strong> - The runtime for our high-performance backend. <a
+                            href="https://dotnet.microsoft.com/download" target="_blank">Download here</a></li>
+                    <li><strong>Node.js 18+</strong> - Required to build and run the modern React frontend. <a
+                            href="https://nodejs.org/" target="_blank">Download here</a>
+                    </li>
+                    <li><strong>LM Studio</strong> - The engine behind the AI. This needs to be running locally on
+                        <code>http://127.0.0.1:1234</code> to provide the intelligence for the chat.
+                    </li>
+                    <li><strong>Caddy</strong> (optional) - A powerful, automatic HTTPS server that acts as a reverse
+                        proxy, simplifying how you access the application.</li>
+                </ul>
+
+                <h3>Option A: SimpleGateway (Recommended for Quick Start)</h3>
+                <p>
+                    If you want to see AIGS in action immediately, the SimpleGateway mode is your best friend. It
+                    abstracts away the complexity of running separate frontend and backend processes. By using our
+                    convenience scripts, you can pull the code, configure the environment, and launch the entire suite
+                    with minimal effort. This is the ideal starting point for most users.
+                </p>
+
+                <pre><code># 1. Clone the repository
+git clone &lt;your-repo-url&gt;
+cd AI_Interface
+
+# 2. Run setup script (installs/configures Caddy)
+./setup-local.sh
+
+# 3. Start the application
+./start-simple.sh
+
+# 4. Open your browser
+# Frontend: http://localhost
+# API: http://localhost/api</code></pre>
+
+                <div class="alert alert-info">
+                    <strong>Default Login:</strong> Use username <code>admin</code> and password <code>admin</code> for
+                    your first login. Change this immediately in production!
+                </div>
+
+                <p>To stop the application:</p>
+                <pre><code>./stop-simple.sh</code></pre>
+
+                <p>Check status:</p>
+                <pre><code>./status.sh</code></pre>
+
+                <h3>Option B: Layered Stack (Development Mode)</h3>
+                <p>For development with hot reload:</p>
+
+                <pre><code># 1. Start the backend API</ code>
+cd src/Gateway.Api
+dotnet run --urls="http://localhost:5000"
+
+# 2. In a new terminal, start the frontend
+cd src/WebApp
+npm install
+npm run dev
+
+# Frontend will be available at: http://localhost:5173
+# API will be at: http://localhost:5000</code></pre>
+
+                <div class="alert alert-warning">
+                    <strong>Note:</strong> In development mode, you'll need to ensure CORS is configured correctly in
+                    <code>appsettings.json</code> to allow requests from localhost:5173.
+                </div>
+            </section>
+
+            <!-- Technology Stack -->
+            <section class="section">
+                <h2>Technology Stack</h2>
+                <p>
+                    AIGS is built on a foundation of modern, battle-tested technologies. We didn't just pick the newest
+                    hype; we chose tools that offer the best balance of performance, developer experience, and long-term
+                    maintainability. The architecture couples a high-performance ASP.NET Core backend with a reactive,
+                    type-safe React frontend, ensuring the application feels snappy and robust.
+                </p>
+                <p>
+                    Every component in the stack serves a specific purpose in delivering a premium local AI experience.
+                    From the database layer up to the UI styling, here is a breakdown of the technologies that power
+                    AIGS and why we chose them:
+                </p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Technology</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Frontend Framework</strong></td>
+                            <td>React 18 + TypeScript</td>
+                            <td>Modern, type-safe UI development</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Build Tool</strong></td>
+                            <td>Vite</td>
+                            <td>Fast dev server, HMR, optimized builds</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Styling</strong></td>
+                            <td>Tailwind CSS</td>
+                            <td>Utility-first CSS, dark mode support</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Backend Framework</strong></td>
+                            <td>ASP.NET Core 8</td>
+                            <td>High-performance REST API with Minimal APIs</td>
+                        </tr>
+                        <tr>
+                            <td><strong>ORM</strong></td>
+                            <td>Entity Framework Core</td>
+                            <td>Type-safe database access, migrations</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Database</strong></td>
+                            <td>SQLite</td>
+                            <td>Embedded database for local/dev (Postgres/SQL Server for production)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authentication</strong></td>
+                            <td>JWT (JSON Web Tokens)</td>
+                            <td>Stateless authentication with secure cookies</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Password Hashing</strong></td>
+                            <td>BCrypt</td>
+                            <td>Industry-standard password security</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Validation</strong></td>
+                            <td>FluentValidation</td>
+                            <td>Fluent, type-safe input validation</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Reverse Proxy</strong></td>
+                            <td>Caddy or Nginx</td>
+                            <td>TLS termination, static file serving, API routing</td>
+                        </tr>
+                        <tr>
+                            <td><strong>AI Backend</strong></td>
+                            <td>LM Studio</td>
+                            <td>Local LLM inference with OpenAI-compatible API</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Monitoring</strong></td>
+                            <td>Prometheus metrics</td>
+                            <td>Performance monitoring, custom metrics</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Deployment Modes -->
+            <section class="section">
+                <h2>Deployment Modes</h2>
+                <p>
+                    One size rarely fits all in software deployment. That's why AIGS is designed with flexibility in
+                    mind. Depending on your needs—whether you're hacking on a new feature over the weekend or deploying
+                    a stable tool for your team—you can choose the deployment model that makes the most sense for you.
+                    Both modes share the same core DNA but package it differently.
+                </p>
+
+                <h3>SimpleGateway (Monolithic)</h3>
+                <p>
+                    The SimpleGateway mode is all about reducing friction. It bundles the frontend, backend, and
+                    database
+                    management into a single, cohesive unit. This approach minimizes the "moving parts" you need to
+                    manage, making it incredibly easy to deploy on a single machine or distribute to users who might not
+                    be technical experts.
+                </p>
+                <div class="card">
+                    <p><strong>Best for:</strong> Quick deployments, local development, demos, single-user setups</p>
+                    <p><strong>Characteristics:</strong></p>
+                    <ul>
+                        <li>Single executable with all layers combined</li>
+                        <li>Built-in EF Core migrations</li>
+                        <li>SQLite database by default</li>
+                        <li>Admin tools and backup services included</li>
+                        <li>Easy to deploy with included scripts</li>
+                        <li>Perfect for air-gapped or offline environments</li>
+                    </ul>
+                    <p><strong>Use when:</strong> You need a quick setup, are running locally, or prefer simplicity over
+                        separation of concerns.</p>
+                </div>
+
+                <h3>Layered Architecture</h3>
+                <p>
+                    For scenarios demanding more rigor, the Layered Architecture mode shines. It strictly enforces
+                    separation
+                    of concerns, ensuring that your business logic, API endpoints, and infrastructure code remain
+                    distinct.
+                    This is the preferred mode for active development and enterprise environments, as it facilitates
+                    easier
+                    testing, cleaner code organization, and independent scaling of components.
+                </p>
+                <div class="card">
+                    <p><strong>Best for:</strong> Team deployments, production environments, scalability, testability
+                    </p>
+                    <p><strong>Characteristics:</strong></p>
+                    <ul>
+                        <li>Clear separation: Api → Application → Domain → Infrastructure</li>
+                        <li>Dependency Injection throughout</li>
+                        <li>Easy to test individual layers</li>
+                        <li>Supports horizontal scaling</li>
+                        <li>Clean architecture principles</li>
+                        <li>Can swap database/integrations easily</li>
+                    </ul>
+                    <p><strong>Use when:</strong> You need enterprise-grade architecture, plan to scale, have a team, or
+                        require extensive testing.</p>
+                </div>
+
+                <div class="alert alert-success">
+                    <strong>Tip:</strong> Start with SimpleGateway for proof-of-concept, then migrate to the layered
+                    architecture when you need more structure or scalability.
+                </div>
+            </section>
+
+            <!--Next Steps -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <p>
+                    Now that you have a high-level understanding of what AIGS is and how it works, the real journey
+                    begins. We've prepared detailed deep-dive documentation to guide you through every aspect of the
+                    system. Whether you want to inspect the database schema, understand the React component tree, or
+                    trace a request from the frontend to the LLM, the resources below will take you there.
+                </p>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="architecture.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📐 Explore the Architecture</div>
+                        <p class="card-description">Understand how AIGS components work together, deployment shapes, and
+                            system design.</p>
+                    </a>
+
+                    <a href="domain-models.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🗄️ Domain Models Deep Dive</div>
+                        <p class="card-description">Learn about the core entities: User, Conversation, Message, and
+                            UsageLog with source code.</p>
+                    </a>
+
+                    <a href="api-reference.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📡 API Reference</div>
+                        <p class="card-description">Complete documentation of all API endpoints with request/response
+                            examples.</p>
+                    </a>
+
+                    <a href="development.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">💻 Development Guide</div>
+                        <p class="card-description">Set up your development environment, run tests, and start
+                            contributing.</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

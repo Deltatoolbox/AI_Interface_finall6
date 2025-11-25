@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Domain Models Deep Dive</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+            <a href="development.html" class="nav-link">Development</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Domain Models</span>
+            </div>
+
+            <h1>Domain Models Deep Dive</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                Explore the core domain entities that form the foundation of AIGS. Each model includes complete source
+                code, property explanations, and relationship details.
+            </p>
+
+            <!-- Entity Relationship Diagram -->
+            <section class="section">
+                <h2>Entity Relationship Diagram</h2>
+                <div class="mermaid">
+                    erDiagram
+                    User ||--o{ Conversation : has
+                    User ||--o{ UsageLog : generates
+                    Conversation ||--o{ Message : contains
+
+                    User {
+                    Guid Id PK
+                    string Username
+                    string PasswordHash
+                    string Role
+                    DateTime CreatedAt
+                    bool Is Active
+                    int DailyTokenQuota
+                    }
+
+                    Conversation {
+                    Guid Id PK
+                    Guid UserId FK
+                    string Title
+                    DateTime CreatedAt
+                    DateTime UpdatedAt
+                    }
+
+                    Message {
+                    Guid Id PK
+                    Guid ConversationId FK
+                    string Role
+                    string Content
+                    int PromptTokens
+                    int CompletionTokens
+                    long LatencyMs
+                    DateTime CreatedAt
+                    }
+
+                    UsageLog {
+                    Guid Id PK
+                    Guid UserId FK
+                    string Model
+                    int PromptTokens
+                    int CompletionTokens
+                    int TotalTokens
+                    DateTime CreatedAt
+                    }
+                </div>
+            </section>
+
+            <!-- User Model -->
+            <section class="section">
+                <h2 id="user-model">User Model</h2>
+                <p>
+                    The <code>User</code> entity represents a user account in the system. Users can have different roles
+                    (Admin, User) and own multiple conversations. The model includes authentication fields, token quota
+                    management, and navigation properties.
+                </p>
+
+                <h3>Source Code</h3>
+                <p><strong>Location:</strong> <code>src/Gateway.Domain/Entities/User.cs</code></p>
+                <pre><code>using System.ComponentModel.DataAnnotations;
+
+namespace Gateway.Domain.Entities;
+
+public sealed class User
+{
+    public Guid Id { get; set; }
+    
+    [Required]
+    [MaxLength(50)]
+    public string Username { get; set; } = string.Empty;
+    
+    [Required]
+    [MaxLength(255)]
+    public string PasswordHash { get; set; } = string.Empty;
+    
+    [Required]
+    [MaxLength(20)]
+    public string Role { get; set; } = "User";
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public bool IsActive { get; set; } = true;
+    
+    public int DailyTokenQuota { get; set; } = 100000;
+    
+    public ICollection&lt;Conversation&gt; Conversations { get; set; } = new List&lt;Conversation&gt;();
+    
+    public ICollection&lt;UsageLog&gt; UsageLogs { get; set; } = new List&lt;UsageLog&gt;();
+}</code></pre>
+
+                <h3>Property Details</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Id</code></td>
+                            <td>Guid</td>
+                            <td>Unique identifier for the user (Primary Key)</td>
+                        </tr>
+                        <tr>
+                            <td><code>Username</code></td>
+                            <td>string (max 50)</td>
+                            <td>Unique username for login. Required field with max length validation.</td>
+                        </tr>
+                        <tr>
+                            <td><code>PasswordHash</code></td>
+                            <td>string (max 255)</td>
+                            <td>BCrypt-hashed password. Never stored in plaintext. Max 255 chars to accommodate hash
+                                length.</td>
+                        </tr>
+                        <tr>
+                            <td><code>Role</code></td>
+                            <td>string (max 20)</td>
+                            <td>User role: "Admin" or "User". Defaults to "User". Used for authorization.</td>
+                        </tr>
+                        <tr>
+                            <td><code>CreatedAt</code></td>
+                            <td>DateTime</td>
+                            <td>Timestamp of account creation. Defaults to UTC now.</td>
+                        </tr>
+                        <tr>
+                            <td><code>IsActive</code></td>
+                            <td>bool</td>
+                            <td>Whether the account is active. Defaults to true. Can be used for soft deletion or
+                                account suspension.</td>
+                        </tr>
+                        <tr>
+                            <td><code>DailyTokenQuota</code></td>
+                            <td>int</td>
+                            <td>Daily token usage limit for rate limiting. Defaults to 100,000 tokens.</td>
+                        </tr>
+                        <tr>
+                            <td><code>Conversations</code></td>
+                            <td>ICollection&lt;Conversation&gt;</td>
+                            <td>Navigation property for all conversations owned by this user.</td>
+                        </tr>
+                        <tr>
+                            <td><code>UsageLogs</code></td>
+                            <td>ICollection&lt;UsageLog&gt;</td>
+                            <td>Navigation property for all usage logs generated by this user.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Usage Examples</h3>
+                <pre><code>// Creating a new user with BCrypt password hashing
+var user = new User
+{
+    Id = Guid.NewGuid(),
+    Username = "john.doe",
+    PasswordHash = BCrypt.Net.BCrypt.HashPassword("SecurePassword123"),
+    Role = "User",
+    IsActive = true,
+    DailyTokenQuota = 100000
+};
+
+// Checking user role
+if (user.Role == "Admin")
+{
+    // Grant admin privileges
+}
+
+// Token quota validation
+var tokensUsedToday = await GetTokenUsageForToday(user.Id);
+if (tokensUsedToday >= user.DailyTokenQuota)
+{
+    throw new QuotaExceededException();
+}</code></pre>
+            </section>
+
+            <!-- Conversation Model -->
+            <section class="section">
+                <h2 id="conversation-model">Conversation Model</h2>
+                <p>
+                    The <code>Conversation</code> entity represents a chat thread between a user and the AI. It
+                    aggregates multiple messages and tracks metadata like title and timestamps.
+                </p>
+
+                <h3>Source Code</h3>
+                <p><strong>Location:</strong> <code>src/Gateway.Domain/Entities/Conversation.cs</code></p>
+                <pre><code>using System.ComponentModel.DataAnnotations;
+
+namespace Gateway.Domain.Entities;
+
+public sealed class Conversation
+{
+    public Guid Id { get; set; }
+    
+    public Guid UserId { get; set; }
+    
+    [Required]
+    [MaxLength(200)]
+    public string Title { get; set; } = string.Empty;
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    
+    public User User { get; set; } = null!;
+    
+    public ICollection&lt;Message&gt; Messages { get; set; } = new List&lt;Message&gt;();
+}</code></pre>
+
+                <h3>Property Details</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Id</code></td>
+                            <td>Guid</td>
+                            <td>Unique identifier for the conversation (Primary Key)</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserId</code></td>
+                            <td>Guid</td>
+                            <td>Foreign key to the User who owns this conversation. Enforces ownership.</td>
+                        </tr>
+                        <tr>
+                            <td><code>Title</code></td>
+                            <td>string (max 200)</td>
+                            <td>Human-readable title for the conversation. Required, max 200 characters.</td>
+                        </tr>
+                        <tr>
+                            <td><code>CreatedAt</code></td>
+                            <td>DateTime</td>
+                            <td>Timestamp when the conversation was created. Defaults to UTC now.</td>
+                        </tr>
+                        <tr>
+                            <td><code>UpdatedAt</code></td>
+                            <td>DateTime</td>
+                            <td>Timestamp of last update. Should be updated whenever messages are added.</td>
+                        </tr>
+                        <tr>
+                            <td><code>User</code></td>
+                            <td>User</td>
+                            <td>Navigation property to the owning user. Null-forgiving operator used as EF Core will
+                                populate this.</td>
+                        </tr>
+                        <tr>
+                            <td><code>Messages</code></td>
+                            <td>ICollection&lt;Message&gt;</td>
+                            <td>Navigation property for all messages in this conversation.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Usage Examples</h3>
+                <pre><code>// Creating a new conversation
+var conversation = new Conversation
+{
+    Id = Guid.NewGuid(),
+    UserId = user.Id,
+    Title = "Technical Discussion",
+    CreatedAt = DateTime.UtcNow,
+    UpdatedAt = DateTime.UtcNow
+};
+
+// Updating conversation when new message is added
+conversation.UpdatedAt = DateTime.UtcNow;
+await context.SaveChangesAsync();
+
+// Loading conversation with messages (eager loading)
+var conv = await context.Conversations
+    .Include(c => c.Messages)
+    .Include(c => c.User)
+    .FirstOrDefaultAsync(c => c.Id == conversationId);</code></pre>
+            </section>
+
+            <!-- Message Model -->
+            <section class="section">
+                <h2 id="message-model">Message Model</h2>
+                <p>
+                    The <code>Message</code> entity represents a single message within a conversation. It can be a user
+                    message, assistant response, or system message. The model tracks token usage and latency metrics.
+                </p>
+
+                <h3>Source Code</h3>
+                <p><strong>Location:</strong> <code>src/Gateway.Domain/Entities/Message.cs</code></p>
+                <pre><code>using System.ComponentModel.DataAnnotations;
+
+namespace Gateway.Domain.Entities;
+
+public sealed class Message
+{
+    public Guid Id { get; set; }
+    
+    public Guid ConversationId { get; set; }
+    
+    [Required]
+    [MaxLength(20)]
+    public string Role { get; set; } = string.Empty;
+    
+    [Required]
+    public string Content { get; set; } = string.Empty;
+    
+    public int PromptTokens { get; set; }
+    
+    public int CompletionTokens { get; set; }
+    
+    public long LatencyMs { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public Conversation Conversation { get; set; } = null!;
+}</code></pre>
+
+                <h3>Property Details</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Id</code></td>
+                            <td>Guid</td>
+                            <td>Unique identifier for the message (Primary Key)</td>
+                        </tr>
+                        <tr>
+                            <td><code>ConversationId</code></td>
+                            <td>Guid</td>
+                            <td>Foreign key to the parent Conversation</td>
+                        </tr>
+                        <tr>
+                            <td><code>Role</code></td>
+                            <td>string (max 20)</td>
+                            <td>Message role: "user", "assistant", or "system". OpenAI-compatible format.</td>
+                        </tr>
+                        <tr>
+                            <td><code>Content</code></td>
+                            <td>string</td>
+                            <td>The actual message content. No size limit to support long responses.</td>
+                        </tr>
+                        <tr>
+                            <td><code>PromptTokens</code></td>
+                            <td>int</td>
+                            <td>Number of tokens in the prompt/input. Used for usage tracking.</td>
+                        </tr>
+                        <tr>
+                            <td><code>CompletionTokens</code></td>
+                            <td>int</td>
+                            <td>Number of tokens in the completion/response. Used for usage tracking.</td>
+                        </tr>
+                        <tr>
+                            <td><code>LatencyMs</code></td>
+                            <td>long</td>
+                            <td>Response latency in milliseconds. Used for performance monitoring.</td>
+                        </tr>
+                        <tr>
+                            <td><code>CreatedAt</code></td>
+                            <td>DateTime</td>
+                            <td>Timestamp when the message was created. Defaults to UTC now.</td>
+                        </tr>
+                        <tr>
+                            <td><code>Conversation</code></td>
+                            <td>Conversation</td>
+                            <td>Navigation property to the parent conversation.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Role Types</h3>
+                <ul>
+                    <li><code>"user"</code> - Messages from the end user</li>
+                    <li><code>"assistant"</code> - Responses from the AI model</li>
+                    <li><code>"system"</code> - System prompts/instructions (e.g., from templates)</li>
+                </ul>
+
+                <h3>Usage Examples</h3>
+                <pre><code>// Creating a user message
+var userMessage = new Message
+{
+    Id = Guid.NewGuid(),
+    ConversationId = conversation.Id,
+    Role = "user",
+    Content = "Explain quantum computing",
+    PromptTokens = 15,
+    CompletionTokens = 0,
+    LatencyMs = 0,
+    CreatedAt = DateTime.UtcNow
+};
+
+// Creating an assistant response with metrics
+var assistantMessage = new Message
+{
+    Id = Guid.NewGuid(),
+    ConversationId = conversation.Id,
+    Role = "assistant",
+    Content = "Quantum computing is...",
+    PromptTokens = 15,
+    CompletionTokens = 250,
+    LatencyMs = 1523,
+    CreatedAt = DateTime.UtcNow
+};
+
+// Querying messages by role
+var userMessages = await context.Messages
+    .Where(m => m.ConversationId == convId && m.Role == "user")
+    .OrderBy(m => m.CreatedAt)
+    .ToListAsync();</code></pre>
+            </section>
+
+            <!-- UsageLog Model -->
+            <section class="section">
+                <h2 id="usagelog-model">UsageLog Model</h2>
+                <p>
+                    The <code>UsageLog</code> entity tracks token usage per user for analytics, billing, and quota
+                    enforcement. It provides a historical record of model usage.
+                </p>
+
+                <h3>Source Code</h3>
+                <p><strong>Location:</strong> <code>src/Gateway.Domain/Entities/UsageLog.cs</code></p>
+                <pre><code>using System.ComponentModel.DataAnnotations;
+
+namespace Gateway.Domain.Entities;
+
+public sealed class UsageLog
+{
+    public Guid Id { get; set; }
+    
+    public Guid UserId { get; set; }
+    
+    [Required]
+    [MaxLength(100)]
+    public string Model { get; set; } = string.Empty;
+    
+    public int PromptTokens { get; set; }
+    
+    public int CompletionTokens { get; set; }
+    
+    public int TotalTokens { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public User User { get; set; } = null!;
+}</code></pre>
+
+                <h3>Property Details</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Id</code></td>
+                            <td>Guid</td>
+                            <td>Unique identifier for the usage log entry (Primary Key)</td>
+                        </tr>
+                        <tr>
+                            <td><code>UserId</code></td>
+                            <td>Guid</td>
+                            <td>Foreign key to the User who generated this usage</td>
+                        </tr>
+                        <tr>
+                            <td><code>Model</code></td>
+                            <td>string (max 100)</td>
+                            <td>Name of the AI model used (e.g., "llama-2-7b", "gpt-3.5-turbo")</td>
+                        </tr>
+                        <tr>
+                            <td><code>PromptTokens</code></td>
+                            <td>int</td>
+                            <td>Number of tokens in the input/prompt</td>
+                        </tr>
+                        <tr>
+                            <td><code>CompletionTokens</code></td>
+                            <td>int</td>
+                            <td>Number of tokens in the completion/response</td>
+                        </tr>
+                        <tr>
+                            <td><code>TotalTokens</code></td>
+                            <td>int</td>
+                            <td>Sum of prompt and completion tokens (promptTokens + completionTokens)</td>
+                        </tr>
+                        <tr>
+                            <td><code>CreatedAt</code></td>
+                            <td>DateTime</td>
+                            <td>Timestamp when this usage occurred. Defaults to UTC now.</td>
+                        </tr>
+                        <tr>
+                            <td><code>User</code></td>
+                            <td>User</td>
+                            <td>Navigation property to the user who generated this usage.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Usage Examples</h3>
+                <pre><code>// Logging token usage after a chat completion
+var usageLog = new UsageLog
+{
+    Id = Guid.NewGuid(),
+    UserId = user.Id,
+    Model = "llama-2-7b",
+    PromptTokens = 50,
+    CompletionTokens = 200,
+    TotalTokens = 250,
+    CreatedAt = DateTime.UtcNow
+};
+await context.UsageLogs.AddAsync(usageLog);
+await context.SaveChangesAsync();
+
+// Calculating daily usage for quota enforcement
+var today = DateTime.UtcNow.Date;
+var tomorrow = today.AddDays(1);
+var dailyUsage = await context.UsageLogs
+    .Where(ul => ul.UserId == userId && 
+                 ul.CreatedAt >= today && 
+                 ul.CreatedAt < tomorrow)
+    .SumAsync(ul => ul.TotalTokens);
+
+// Analytics: Most used models
+var modelStats = await context.UsageLogs
+    .GroupBy(ul => ul.Model)
+    .Select(g => new { Model = g.Key, TotalTokens = g.Sum(ul => ul.TotalTokens) })
+    .OrderByDescending(x => x.TotalTokens)
+    .ToListAsync();</code></pre>
+            </section>
+
+            <!-- Model Relationships -->
+            <section class="section">
+                <h2>Model Relationships</h2>
+                <p>Understanding how the domain models relate to each other is crucial for working with the data layer:
+                </p>
+
+                <h3>One-to-Many Relationships</h3>
+                <ul>
+                    <li><strong>User → Conversations</strong>: A user can have many conversations, but each conversation
+                        belongs to exactly one user.</li>
+                    <li><strong>User → UsageLogs</strong>: A user can generate many usage log entries.</li>
+                    <li><strong>Conversation → Messages</strong>: A conversation contains many messages, ordered
+                        chronologically.</li>
+                </ul>
+
+                <h3>EF Core Configuration</h3>
+                <p>Entity Framework Core is configured to handle these relationships automatically. Key configurations:
+                </p>
+                <pre><code>// In DbContext OnModelCreating
+modelBuilder.Entity&lt;Conversation&gt;()
+    .HasOne(c => c.User)
+    .WithMany(u => u.Conversations)
+    .HasForeignKey(c => c.UserId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+modelBuilder.Entity&lt;Message&gt;()
+    .HasOne(m => m.Conversation)
+    .WithMany(c => c.Messages)
+    .HasForeignKey(m => m.ConversationId)
+    .OnDelete(DeleteBehavior.Cascade);
+
+modelBuilder.Entity&lt;UsageLog&gt;()
+    .HasOne(ul => ul.User)
+    .WithMany(u => u.UsageLogs)
+    .HasForeignKey(ul => ul.UserId)
+    .OnDelete(DeleteBehavior.Cascade);</code></pre>
+
+                <div class="alert alert-info">
+                    <strong>Cascade Delete:</strong> When a user is deleted, all their conversations and usage logs are
+                    automatically deleted. When a conversation is deleted, all its messages are deleted.
+                </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="application-layer.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🔧 Application Layer</div>
+                        <p class="card-description">Learn how services and DTOs work with these domain models.</p>
+                    </a>
+
+                    <a href="infrastructure-layer.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🗄️ Infrastructure Layer</div>
+                        <p class="card-description">Understand how EF Core repositories interact with the database.</p>
+                    </a>
+
+                    <a href="api-reference.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">📡 API Reference</div>
+                        <p class="card-description">See how these models are exposed through the API endpoints.</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

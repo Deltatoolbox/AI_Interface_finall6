@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - API Reference</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="api-reference.html" class="nav-link active">API</a>
+            <a href="development.html" class="nav-link">Development</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>API Reference</span>
+            </div>
+
+            <h1>API Reference</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                Complete documentation for all AIGS API endpoints. All endpoints follow RESTful conventions and return
+                JSON responses.
+            </p>
+
+            <!-- Base URL -->
+            <section class="section">
+                <h2>Base URL</h2>
+                <pre><code>http://localhost/api        # Production (via Caddy/Nginx)
+http://localhost:5000/api  # Development (direct)</code></pre>
+            </section>
+
+            <!-- Authentication -->
+            <section class="section">
+                <h2 id="authentication">Authentication</h2>
+                <p>
+                    AIGS uses JWT (JSON Web Tokens) for authentication. Tokens are issued upon successful login and
+                    stored as HTTP-only cookies. Include the token in requests via cookie or Authorization header.
+                </p>
+
+                <h3>POST /api/auth/login</h3>
+                <p>Authenticate a user and receive a JWT token.</p>
+
+                <h4>Request</h4>
+                <pre><code>POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin"
+}</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "message": "Login successful",
+  "user": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "username": "admin",
+    "email": "",
+    "role": "Admin",
+    "createdAt": "2024-01-01T00:00:00Z"
+  }
+}</code></pre>
+
+                <h4>Response (401 Unauthorized)</h4>
+                <pre><code>{
+  "type": "https://tools.ietf.org/html/rfc7235#section-3.1",
+  "title": "Unauthorized",
+  "status": 401
+}</code></pre>
+
+                <h3>POST /api/auth/logout</h3>
+                <p>Log out the current user and clear the authentication cookie.</p>
+
+                <h4>Request</h4>
+                <pre><code>POST /api/auth/logout
+Cookie: access_token=...</code></pre>
+
+                <h4>Response (204 No Content)</h4>
+                <p>No response body. Cookie is cleared.</p>
+
+                <h3>POST /api/auth/register</h3>
+                <p>Register a new user account (if self-registration is enabled).</p>
+
+                <h4>Request</h4>
+                <pre><code>POST /api/auth/register
+Content-Type: application/json
+
+{
+  "username": "john.doe",
+  "password": "SecurePassword123",
+  "email": "john@example.com"
+}</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "success": true,
+  "message": "User created successfully",
+  "user": {
+    "id": "uuid",
+    "username": "john.doe",
+    "email": "john@example.com",
+    "role": "User",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+}</code></pre>
+
+                <div class="alert alert-info">
+                    <strong>Default Login:</strong> The default admin credentials are <code>admin</code> /
+                    <code>admin</code>. Change these immediately in production!
+                </div>
+            </section>
+
+            <!-- Models -->
+            <section class="section">
+                <h2 id="models">Models</h2>
+
+                <h3>GET /api/models</h3>
+                <p>Retrieve available AI models from LM Studio.</p>
+
+                <h4>Request</h4>
+                <pre><code>GET /api/models</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "data": [
+    {
+      "id": "llama-2-7b",
+      "object": "model",
+      "created": 1234567890,
+      "owned_by": "meta"
+    },
+    {
+      "id": "mistral-7b-instruct",
+      "object": "model",
+      "created": 1234567890,
+      "owned_by": "mistralai"
+    }
+  ]
+}</code></pre>
+
+                <div class="alert alert-warning">
+                    <strong>Note:</strong> If LM Studio is not available, the API returns fallback models. Ensure LM
+                    Studio is running on <code>http://localhost:1234</code>.
+                </div>
+            </section>
+
+            <!-- Chat -->
+            <section class="section">
+                <h2 id="chat">Chat</h2>
+
+                <h3>POST /api/chat</h3>
+                <p>Send a chat message and receive an AI response. Supports streaming responses.</p>
+
+                <h4>Request</h4>
+                <pre><code>POST /api/chat
+Content-Type: application/json
+Cookie: access_token=...
+
+{
+  "model": "llama-2-7b",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Explain quantum computing in simple terms"
+    }
+  ],
+  "conversationId": "uuid-optional",
+  "temperature": 0.7,
+  "max_tokens": 1000
+}</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "id": "chatcmpl-123",
+  "object": "chat.completion",
+  "created": 1677652288,
+  "model": "llama-2-7b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Quantum computing is a revolutionary approach..."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 15,
+    "completion_tokens": 120,
+    "total_tokens": 135
+  }
+}</code></pre>
+
+                <h4>Message Roles</h4>
+                <ul>
+                    <li><code>"user"</code> - Messages from the end user</li>
+                    <li><code>"assistant"</code> - Responses from the AI</li>
+                    <li><code>"system"</code> - System prompts/instructions</li>
+                </ul>
+            </section>
+
+            <!-- Conversations -->
+            <section class="section">
+                <h2 id="conversations">Conversations</h2>
+
+                <h3>GET /api/conversations</h3>
+                <p>Retrieve all conversations for the authenticated user.</p>
+
+                <h4>Request</h4>
+                <pre><code>GET /api/conversations
+Cookie: access_token=...</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "data": [
+    {
+      "id": "conv-uuid-1",
+      "title": "Technical Discussion",
+      "createdAt": "2024-01-10T14:30:00Z",
+      "updatedAt": "2024-01-10T15:45:00Z",
+      "model": "llama-2-7b",
+      "category": "Technical"
+    },
+    {
+      "id": "conv-uuid-2",
+      "title": "Brainstorming Session",
+      "createdAt": "2024-01-11T09:00:00Z",
+      "updatedAt": "2024-01-11T10:20:00Z",
+      "model": "mistral-7b-instruct",
+      "category": "Creative"
+    }
+  ]
+}</code></pre>
+
+                <h3>POST /api/conversations</h3>
+                <p>Create a new conversation.</p>
+
+                <h4>Request</h4>
+                <pre><code>POST /api/conversations
+Content-Type: application/json
+Cookie: access_token=...
+
+{
+  "title": "New Conversation",
+  "model": "llama-2-7b",
+  "category": "General"
+}</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "id": "new-uuid",
+  "title": "New Conversation",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z",
+  "model": "llama-2-7b",
+  "category": "General"
+}</code></pre>
+
+                <h3>GET /api/conversations/{id}</h3>
+                <p>Retrieve a specific conversation with all its messages.</p>
+
+                <h4>Request</h4>
+                <pre><code>GET /api/conversations/conv-uuid-1
+Cookie: access_token=...</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "messages": [
+    {
+      "id": "msg-1",
+      "role": "user",
+      "content": "Hello",
+      "promptTokens": 5,
+      "completionTokens": 0,
+      "latencyMs": 0,
+      "createdAt": "2024-01-10T14:30:00Z"
+    },
+    {
+      "id": "msg-2",
+      "role": "assistant",
+      "content": "Hello! How can I help you today?",
+      "promptTokens": 5,
+      "completionTokens": 12,
+      "latencyMs": 523,
+      "createdAt": "2024-01-10T14:30:05Z"
+    }
+  ]
+}</code></pre>
+
+                <h3>PUT /api/conversations/{id}</h3>
+                <p>Update a conversation's title.</p>
+
+                <h4>Request</h4>
+                <pre><code>PUT /api/conversations/conv-uuid-1
+Content-Type: application/json
+Cookie: access_token=...
+
+{
+  "title": "Updated Title"
+}</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "id": "conv-uuid-1",
+  "title": "Updated Title",
+  "createdAt": "2024-01-10T14:30:00Z",
+  "updatedAt": "2024-01-15T11:00:00Z"
+}</code></pre>
+
+                <h3>DELETE /api/conversations/{id}</h3>
+                <p>Delete a specific conversation and all its messages.</p>
+
+                <h4>Request</h4>
+                <pre><code>DELETE /api/conversations/conv-uuid-1
+Cookie: access_token=...</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "message": "Conversation deleted successfully"
+}</code></pre>
+            </section>
+
+            <!-- Admin Endpoints -->
+            <section class="section">
+                <h2 id="admin">Admin Endpoints</h2>
+                <p>These endpoints require Admin role.</p>
+
+                <h3>GET /api/admin/users</h3>
+                <p>List all users (Admin only).</p>
+
+                <h4>Request</h4>
+                <pre><code>GET /api/admin/users
+Cookie: access_token=...</code></pre>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>[
+  {
+    "id": "user-1",
+    "username": "admin",
+    "email": "",
+    "role": "Admin",
+    "createdAt": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": "user-2",
+    "username": "john.doe",
+    "email": "john@example.com",
+    "role": "User",
+    "createdAt": "2024-01-10T10:00:00Z"
+  }
+]</code></pre>
+
+                <h3>POST /api/admin/users</h3>
+                <p>Create a new user (Admin only).</p>
+
+                <h4>Request</h4>
+                <pre><code>POST /api/admin/users
+Content-Type: application/json
+Cookie: access_token=...
+
+{
+  "username": "new.user",
+  "password": "SecurePassword123",
+  "email": "newuser@example.com",
+  "role": "User"
+}</code></pre>
+
+                <h3>GET /api/admin/stats</h3>
+                <p>Get system statistics (Admin only).</p>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "totalUsers": 15,
+  "totalConversations": 127,
+  "totalMessages": 1543,
+  "lastUpdated": "2024-01-15T12:00:00Z"
+}</code></pre>
+            </section>
+
+            <!-- Health & Metrics -->
+            <section class="section">
+                <h2 id="health">Health & Metrics</h2>
+
+                <h3>GET /health</h3>
+                <p>Health check endpoint (no authentication required).</p>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "status": "healthy",
+  "timestamp": "2024-01-15T12:00:00Z"
+}</code></pre>
+
+                <h3>GET /health/live</h3>
+                <p>Liveness probe for orchestrators.</p>
+
+                <h4>Response (200 OK)</h4>
+                <p>Returns 200 if the service is alive.</p>
+
+                <h3>GET /health/ready</h3>
+                <p>Readiness probe checking dependencies.</p>
+
+                <h4>Response (200 OK)</h4>
+                <pre><code>{
+  "status": "Healthy",
+  "checks": [
+    {
+      "name": "Database",
+      "status": "Healthy",
+      "description": "Database connection is healthy"
+    },
+    {
+      "name": "LM Studio",
+      "status": "Healthy",
+      "description": "LM Studio connection is healthy"
+    }
+  ]
+}</code></pre>
+
+                <h3>GET /metrics</h3>
+                <p>Prometheus metrics endpoint.</p>
+
+                <h4>Response (200 OK - text/plain)</h4>
+                <pre><code># HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/api/models"} 10
+
+# HELP active_streams Current number of active chat streams
+# TYPE active_streams gauge
+active_streams 2</code></pre>
+            </section>
+
+            <!-- Error Responses -->
+            <section class="section">
+                <h2 id="errors">Error Responses</h2>
+                <p>All error responses follow the Problem Details format (RFC 7807).</p>
+
+                <h3>Error Structure</h3>
+                <pre><code>{
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "The request was invalid",
+  "errors": [
+    "Username is required",
+    "Password must be at least 8 characters"
+  ]
+}</code></pre>
+
+                <h3>Common Status Codes</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Status</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>200</td>
+                            <td>OK</td>
+                            <td>Request succeeded</td>
+                        </tr>
+                        <tr>
+                            <td>201</td>
+                            <td>Created</td>
+                            <td>Resource created successfully</td>
+                        </tr>
+                        <tr>
+                            <td>204</td>
+                            <td>No Content</td>
+                            <td>Request succeeded, no response body</td>
+                        </tr>
+                        <tr>
+                            <td>400</td>
+                            <td>Bad Request</td>
+                            <td>Invalid request payload or parameters</td>
+                        </tr>
+                        <tr>
+                            <td>401</td>
+                            <td>Unauthorized</td>
+                            <td>Missing or invalid authentication token</td>
+                        </tr>
+                        <tr>
+                            <td>403</td>
+                            <td>Forbidden</td>
+                            <td>Insufficient permissions for this operation</td>
+                        </tr>
+                        <tr>
+                            <td>404</td>
+                            <td>Not Found</td>
+                            <td>Resource does not exist</td>
+                        </tr>
+                        <tr>
+                            <td>429</td>
+                            <td>Too Many Requests</td>
+                            <td>Rate limit exceeded</td>
+                        </tr>
+                        <tr>
+                            <td>500</td>
+                            <td>Internal Server Error</td>
+                            <td>Server error occurred</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Rate Limiting -->
+            <section class="section">
+                <h2 id="rate-limiting">Rate Limiting</h2>
+                <p>API implements rate limiting per user to prevent abuse:</p>
+                <ul>
+                    <li><strong>Login endpoint:</strong> 5 requests per minute</li>
+                    <li><strong>Other endpoints:</strong> 60 requests per minute</li>
+                </ul>
+
+                <h3>Rate Limit Headers</h3>
+                <pre><code>X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 59
+X-RateLimit-Reset: 1640995200</code></pre>
+
+                <div class="alert alert-warning">
+                    <strong>Exceeding Limits:</strong> When rate limit is exceeded, you'll receive a 429 Too Many
+                    Requests response.
+                </div>
+            </section>
+
+            <!-- CORS -->
+            <section class="section">
+                <h2 id="cors">CORS Configuration</h2>
+                <p>CORS is configured to allow requests from:</p>
+                <ul>
+                    <li><code>http://localhost:5173</code> (development frontend)</li>
+                    <li><code>http://localhost:5174</code> (alternative dev port)</li>
+                    <li>Your production domain (configured in appsettings.json)</li>
+                </ul>
+                <p>Credentials (cookies) are supported for authenticated requests.</p>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="domain-models.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🗄️ Domain Models</div>
+                        <p class="card-description">Understand the data structures behind these API endpoints.</p>
+                    </a>
+
+                    <a href="development.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">💻 Development Guide</div>
+                        <p class="card-description">Learn how to set up your development environment and start building.
+                        </p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

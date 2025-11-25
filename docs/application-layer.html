@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIGS - Application Layer Deep Dive</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <a href="index.html" class="logo">
+                <span>🚀</span>
+                <span>AIGS Documentation</span>
+            </a>
+        </div>
+        <div class="header-nav">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="overview.html" class="nav-link">Overview</a>
+            <a href="architecture.html" class="nav-link">Architecture</a>
+            <a href="application-layer.html" class="nav-link active">Application Layer</a>
+            <a href="api-reference.html" class="nav-link">API</a>
+        </div>
+        <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+    </header>
+
+    <main>
+        <div class="container">
+            <div class="breadcrumbs">
+                <a href="index.html">Home</a>
+                <span class="breadcrumb-separator">/</span>
+                <a href="architecture.html">Architecture</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Application Layer</span>
+            </div>
+
+            <h1>Application Layer - Deep Dive</h1>
+            <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+                The Application Layer is the orchestration center of AIGS. It sits between the HTTP API layer and the
+                domain entities, coordinating business logic, managing workflows, and ensuring that operations are
+                executed correctly. This layer transforms domain entities into data transfer objects (DTOs) for the API,
+                validates inputs, and implements the actual use cases of the application.
+            </p>
+
+            <!-- Overview Section -->
+            <section class="section">
+                <h2>Understanding the Application Layer</h2>
+                <p>
+                    In clean architecture, the Application Layer has a specific and crucial role: <strong>it implements
+                        the use cases</strong>. While the Domain Layer defines <em>what</em> our business entities are
+                    (User, Conversation, Message), the Application Layer defines <em>how</em> we work with them. Think
+                    of this layer as the "conductor" of an orchestra - it doesn't play the instruments (that's the
+                    Domain), but it coordinates when and how each instrument plays to create a cohesive symphony.
+                </p>
+
+                <p>
+                    The Application Layer achieves this through <strong>Services</strong>. Each service is responsible
+                    for a specific area of functionality. For example, the <code>UserService</code> handles everything
+                    related to users: creating them, authenticating them, updating their information, and managing their
+                    accounts. The <code>ConversationService</code> manages chat conversations: creating new ones,
+                    retrieving message history, updating titles, and deleting conversations. These services work
+                    together to implement the complete business logic of the application.
+                </p>
+
+                <h3>Layer Position and Dependencies</h3>
+                <div class="mermaid">
+                    graph TB
+                    API[API Layer<br />HTTP Endpoints] --> App[Application Layer<br />Services & Use Cases]
+                    App --> Domain[Domain Layer<br />Entities & Interfaces]
+                    Infra[Infrastructure Layer<br />Repositories & DB] --> Domain
+                    App --> Infra
+
+                    style App fill:#2196f3,color:#fff
+                    style Domain fill:#ff9800,color:#fff
+                    style Infra fill:#4caf50,color:#fff
+                    style API fill:#9c27b0,color:#fff
+                </div>
+
+                <p>
+                    As the diagram shows, the Application Layer depends on the Domain Layer for entity definitions and
+                    business rules. It also interacts with the Infrastructure Layer to persist data, but it does so
+                    through interfaces defined in the Domain Layer. This means the Application Layer never directly
+                    depends on concrete infrastructure implementations - it only knows about abstract interfaces. This
+                    is the essence of the Dependency Inversion Principle.
+                </p>
+            </section>
+
+            <!-- Service Interfaces -->
+            <section class="section">
+                <h2>Service Interfaces - The Contract Layer</h2>
+                <p>
+                    Before we dive into implementations, let's understand how services are defined. Each service begins
+                    with an <strong>interface</strong> - a contract that specifies what operations the service provides,
+                    without revealing how those operations are implemented. This serves multiple purposes: it allows us
+                    to write tests with mock implementations, it makes the code more flexible (we can swap
+                    implementations), and it provides clear documentation of what each service does.
+                </p>
+
+                <h3>User Service Interface</h3>
+                <p>
+                    The <code>IUserService</code> interface defines all operations related to user management. Let's
+                    examine it in detail:
+                </p>
+
+                <pre><code>public interface IUserService
+{
+    Task&lt;User?&gt; GetUserByUsernameAsync(string username);
+    Task&lt;User?&gt; GetUserByIdAsync(string userId);
+    Task&lt;User?&gt; CreateUserAsync(string username, string password, string email = "", string role = "User");
+    Task&lt;bool&gt; ValidatePasswordAsync(User user, string password);
+    Task&lt;bool&gt; ValidatePasswordAsync(string userId, string password);
+    Task&lt;List&lt;User&gt;&gt; GetAllUsersAsync();
+    Task&lt;User?&gt; UpdateUserAsync(string userId, string? username, string? email, string? role);
+    Task&lt;bool&gt; UpdatePasswordAsync(string userId, string newPassword);
+    Task&lt;bool&gt; DeleteUserAsync(string userId);
+    Task&lt;bool&gt; UserExistsAsync(string username);
+    Task InitializeDefaultUsersAsync();
+}</code></pre>
+
+                <p>
+                    Notice several important patterns here. First, every method returns a <code>Task</code>, making all
+                    operations asynchronous. This is critical for scalability - when we're waiting for database
+                    operations, we don't want to block threads. Second, methods that might not find something return
+                    nullable types (<code>User?</code>), explicitly communicating that "null" is a valid response.
+                    Third, methods that perform actions return <code>bool</code> to indicate success or failure,
+                    providing a simple way to check if an operation worked.
+                </p>
+
+                <h3>Conversation Service Interface</h3>
+                <p>
+                    The <code>IConversationService</code> handles all operations related to conversations and messages.
+                    It's more complex than the User Service because conversations have a nested structure - each
+                    conversation contains multiple messages.
+                </p>
+
+                <pre><code>public interface IConversationService
+{
+    Task&lt;ConversationResponse[]&gt; GetConversationsByUserIdAsync(string userId);
+    Task&lt;ConversationResponse[]&gt; GetAllConversationsForUserAsync(string userId);
+    Task&lt;ConversationResponse&gt; CreateConversationAsync(string userId, string title, string model = "", string category = "General");
+    Task&lt;ConversationResponse&gt; CreateConversationAsync(Conversation conversation);
+    Task&lt;ConversationWithMessagesResponse?&gt; GetConversationWithMessagesAsync(string conversationId, string userId);
+    Task&lt;MessageResponse[]&gt; GetMessagesByConversationIdAsync(string conversationId);
+    Task&lt;ConversationResponse?&gt; UpdateConversationTitleAsync(string conversationId, string userId, string newTitle);
+    Task&lt;bool&gt; DeleteAllConversationsForUserAsync(string userId);
+    Task&lt;bool&gt; DeleteConversationAsync(string conversationId, string userId);
+    Task AddMessageAsync(Message message);
+    Task&lt;SearchResult[]&gt; SearchMessagesAsync(string userId, string query, int? limit = null, int? offset = null);
+}</code></pre>
+
+                <p>
+                    This interface demonstrates several advanced concepts. Notice how it returns
+                    <code>ConversationResponse</code> and <code>ConversationWithMessagesResponse</code> instead of raw
+                    <code>Conversation</code> entities. These are DTOs (Data Transfer Objects) specifically designed for
+                    API responses. They might contain the same data as the domain entity, or they might aggregate data
+                    from multiple entities, or they might exclude sensitive fields. This separation gives us flexibility
+                    in what we expose through the API.
+                </p>
+            </section>
+
+            <!-- User Service Implementation -->
+            <section class="section">
+                <h2>User Service - Implementation Deep Dive</h2>
+                <p>
+                    Now let's examine how the User Service is actually implemented. Understanding this service is key to
+                    understanding the entire application layer, because it demonstrates all the core patterns:
+                    dependency injection, bcrypt password hashing, async database operations, and error handling.
+                </p>
+
+                <h3>Service Structure and Dependencies</h3>
+                <pre><code>public class UserService : IUserService
+{
+    private readonly GatewayDbContext _context;
+
+    public UserService(GatewayDbContext context)
+    {
+        _context = context;
+    }
+    // ... methods
+}</code></pre>
+
+                <p>
+                    The service class implements the <code>IUserService</code> interface. It has a single dependency:
+                    <code>GatewayDbContext</code>, which is Entity Framework Core's database context. This dependency is
+                    injected through the constructor - the service doesn't create its own database connection, it
+                    receives one from the dependency injection container. This makes the service testable (we can inject
+                    a test database) and ensures proper lifecycle management (the DI container handles disposing of the
+                    context).
+                </p>
+
+                <h3>Creating a New User</h3>
+                <p>
+                    User creation is a complex operation that involves multiple steps: checking if the user already
+                    exists, handling role assignment, hashing the password securely, and persisting to the database.
+                    Let's walk through the implementation step by step:
+                </p>
+
+                <pre><code>public async Task&lt;User?&gt; CreateUserAsync(string username, string password, string email = "", string roleName = "User")
+{
+    // Step 1: Check if user already exists
+    var existingUser = await GetUserByUsernameAsync(username);
+    if (existingUser != null)
+        return null;  // User already exists, creation failed
+
+    // Step 2: Find the role by name
+    var role = await _context.UserRoles.FirstOrDefaultAsync(r => r.Name == roleName);
+    if (role == null)
+    {
+        // If requested role doesn't exist, fall back to default "User" role
+        role = await _context.UserRoles.FirstOrDefaultAsync(r => r.Name == "User");
+        if (role == null)
+        {
+            // If NO roles exist at all, create user without role system
+            var user = new User
+            {
+                Username = username,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                Email = email,
+                Role = roleName, // Legacy role field
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+            return user;
+        }
+    }
+
+    // Step 3: Create the new user with proper role
+    var newUser = new User
+    {
+        Username = username,
+        PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),  // BCrypt hashing
+        Email = email,
+        Role = roleName,     // Keep for backward compatibility
+        RoleId = role.Id,    // New role system
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    // Step 4: Add to database and save
+    _context.Users.Add(newUser);
+    await _context.SaveChangesAsync();
+    return newUser;
+}</code></pre>
+
+                <p>
+                    Let's break down the key aspects of this implementation:
+                </p>
+
+                <ul>
+                    <li><strong>Duplicate Check</strong>: Before creating a user, we check if the username is already
+                        taken. This prevents duplicate usernames and returns <code>null</code> to indicate failure.</li>
+                    <li><strong>Role Handling</strong>: The system has migrated from a simple string-based role system
+                        to a more sophisticated role-based access control with a separate <code>UserRoles</code> table.
+                        The code handles both systems for backward compatibility.</li>
+                    <li><strong>Password Security</strong>: Passwords are NEVER stored in plain text. The code uses
+                        BCrypt, a password hashing algorithm specifically designed for security.
+                        <code>BCrypt.HashPassword()</code> not only hashes the password but also includes a salt to
+                        prevent rainbow table attacks.</li>
+                    <li><strong>Async Operations</strong>: Every database call is async.
+                        <code>await _context.SaveChangesAsync()</code> saves changes to the database without blocking
+                        the thread.</li>
+                </ul>
+
+                <h3>Password Validation</h3>
+                <p>
+                    When a user logs in, we need to verify their password. This is done securely using BCrypt's
+                    verification function:
+                </p>
+
+                <pre><code>public async Task&lt;bool&gt; ValidatePasswordAsync(User user, string password)
+{
+    return BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
+}
+
+public async Task&lt;bool&gt; ValidatePasswordAsync(string userId, string password)
+{
+    var user = await GetUserByIdAsync(userId);
+    if (user == null)
+        return false;
+    
+    return BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
+}</code></pre>
+
+                <p>
+                    BCrypt's <code>Verify</code> method takes the plain text password from the login form and the hashed
+                    password from the database, and returns true if they match. Importantly, it does this WITHOUT
+                    decrypting the hash - BCrypt is a one-way function. It hashes the provided password using the same
+                    salt that was used originally, and compares the results.
+                </p>
+
+                <h3>Retrieving Users</h3>
+                <p>
+                    The service provides multiple ways to retrieve users, each optimized for different use cases:
+                </p>
+
+                <pre><code>// Get by username - used during login
+public async Task&lt;User?&gt; GetUserByUsernameAsync(string username)
+{
+    return await _context.Users
+        .FirstOrDefaultAsync(u => u.Username == username);
+}
+
+// Get by ID - used when we already have the user ID from a JWT token
+public async Task&lt;User?&gt; GetUserByIdAsync(string userId)
+{
+    return await _context.Users
+        .FirstOrDefaultAsync(u => u.Id == userId);
+}
+
+// Get all users - admin functionality
+public async Task&lt;List&lt;User&gt;&gt; GetAllUsersAsync()
+{
+    return await _context.Users
+        .OrderBy(u => u.Username)
+        .ToListAsync();
+}</code></pre>
+
+                <p>
+                    Each method uses Entity Framework's LINQ syntax to build SQL queries. T
+                    he <code>FirstOrDefaultAsync</code> method translates to a SQL
+                    <code>SELECT * FROM Users WHERE ...</code> query, but we never write SQL directly. Entity Framework
+                    handles the translation, parameterization (preventing SQL injection), and result mapping.
+                </p>
+            </section>
+
+            <!-- Conversation Service -->
+            <section class="section">
+                <h2>Conversation Service - Handling Complex Workflows</h2>
+                <p>
+                    The Conversation Service is more complex than the User Service because it deals with hierarchical
+                    data: conversations contain messages, and both need to be managed together. It also integrates with
+                    the Encryption Service for secure storage of sensitive messages.
+                </p>
+
+                <h3>Service Dependencies</h3>
+                <pre><code>public class ConversationService : IConversationService
+{
+    private readonly GatewayDbContext _context;
+    private readonly IEncryptionService _encryptionService;
+
+    public ConversationService(GatewayDbContext context, IEncryptionService encryptionService)
+    {
+        _context = context;
+        _encryptionService = encryptionService;
+    }
+}</code></pre>
+
+                <p>
+                    Notice that this service has TWO dependencies: the database context and an encryption service. This
+                    is dependency injection in action - the Conversation Service doesn't care HOW messages are
+                    encrypted, it just knows that there's an <code>IEncryptionService</code> that can do it. The actual
+                    implementation (AES encryption, key management, etc.) is hidden behind the interface.
+                </p>
+
+                <h3>Creating a Conversation</h3>
+                <p>
+                    Creating a conversation is straightforward - it's essentially just creating a new database record:
+                </p>
+
+                <pre><code>public async Task&lt;ConversationResponse&gt; CreateConversationAsync(string userId, string title, string model = "", string category = "General")
+{
+    var conversation = new Conversation
+    {
+        Title = title,
+        UserId = userId,
+        Model = model,
+        Category = category,
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    _context.Conversations.Add(conversation);
+    await _context.SaveChangesAsync();
+
+    return new ConversationResponse(conversation.Id, conversation.Title, conversation.CreatedAt, conversation.UpdatedAt, conversation.Model, conversation.Category);
+}</code></pre>
+
+                <p>
+                    But notice the return type: <code>ConversationResponse</code>, not <code>Conversation</code>. This
+                    is a DTO that contains only the fields we want to expose through the API. By converting to a DTO at
+                    the service layer, we keep the API layer simple - it just returns whatever the service gives it.
+                </p>
+
+                <h3>Retrieving Conversations with Messages</h3>
+                <p>
+                    This is where things get interesting. When fetching a conversation with its message history, we need
+                    to: (1) load the conversation from the database, (2) load all associated messages, (3) decrypt any
+                    encrypted messages, and (4) handle errors gracefully. Here's how it works:
+                </p>
+
+                <pre><code>public async Task&lt;ConversationWithMessagesResponse?&gt; GetConversationWithMessagesAsync(string conversationId, string userId)
+{
+    // Step 1: Load conversation with messages (eager loading)
+    var conversation = await _context.Conversations
+        .Include(c => c.Messages.OrderBy(m => m.CreatedAt))  // Include related messages
+        .FirstOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId);
+
+    if (conversation == null)
+        return null;  // Conversation doesn't exist or user doesn't have access
+
+    // Step 2: Decrypt all messages
+    var decryptedMessages = new List&lt;MessageResponse&gt;();
+    foreach (var message in conversation.Messages)
+    {
+        try
+        {
+            string decryptedContent;
+            
+            // Check if message is encrypted (format: encrypted_data|iv|tag|keyId)
+            if (message.Content.Contains("|") && message.Content.Split('|').Length == 4)
+            {
+                // Message IS encrypted - decrypt it
+                var parts = message.Content.Split('|');
+                var keyId = parts[3];
+                decryptedContent = await _encryptionService.DecryptMessageAsync(message.Content, keyId, userId);
+            }
+            else
+            {
+                // Message is NOT encrypted - return as-is
+                decryptedContent = message.Content;
+            }
+            
+            decryptedMessages.Add(new MessageResponse(message.Id, message.Role, decryptedContent, message.CreatedAt));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to decrypt message {message.Id}: {ex.Message}");
+            // If decryption fails, return a safe error message instead of the encrypted gibberish
+            decryptedMessages.Add(new MessageResponse(message.Id, message.Role, $"[ENCRYPTED - Decryption failed]", message.CreatedAt));
+        }
+    }
+
+    // Step 3: Build and return the response DTO
+    return new ConversationWithMessagesResponse(
+        conversation.Id, 
+        conversation.Title, 
+        conversation.CreatedAt, 
+        conversation.UpdatedAt, 
+        conversation.Model,
+        conversation.Category,
+        decryptedMessages.ToArray());
+}</code></pre>
+
+                <p>
+                    This method demonstrates several advanced patterns:
+                </p>
+
+                <ul>
+                    <li><strong>Eager Loading</strong>: <code>.Include(c => c.Messages)</code> tells Entity Framework to
+                        load messages in the same database query. Without this, we'd have the "N+1 query problem" - one
+                        query for the conversation plus N queries for each message.</li>
+                    <li><strong>Security Check</strong>: <code>c.UserId == userId</code> ensures users can only access
+                        their own conversations. This is a crucial security measure - we never trust the client.</li>
+                    <li><strong>Conditional Decryption</strong>: The code checks if a message is encrypted before trying
+                        to decrypt it. This allows the system to have both encrypted and plaintext messages.</li>
+                    <li><strong>Error Handling</strong>: If decryption fails, we catch the exception and return a safe
+                        error message. This prevents the entire API call from failing if one message is corrupted.</li>
+                </ul>
+
+                <h3>Message Searching with Decryption</h3>
+                <p>
+                    Search is particularly challenging with encrypted messages - you can't search encrypted text! The
+                    service handles this by decrypting messages before searching:
+                </p>
+
+                <pre><code>public async Task&lt;SearchResult[]&gt; SearchMessagesAsync(string userId, string query, int? limit = null, int? offset = null)
+{
+    if (string.IsNullOrWhiteSpace(query))
+        return Array.Empty&lt;SearchResult&gt;();
+
+    // Query the database for potentially matching messages
+    var baseQuery = _context.Messages
+        .Where(m => m.Conversation.UserId == userId && m.Content.Contains(query))
+        .Include(m => m.Conversation)
+        .OrderByDescending(m => m.CreatedAt);
+
+    var messages = await baseQuery
+        .Skip(offset ?? 0)
+        .Take(limit ?? 50)
+        .ToArrayAsync();
+
+    // Decrypt each message and check if it actually matches the search query
+    var searchResults = new List&lt;SearchResult&gt;();
+    foreach (var message in messages)
+    {
+        try
+        {
+            string decryptedContent;
+            if (message.Content.Contains("|") && message.Content.Split('|').Length == 4)
+            {
+                var parts = message.Content.Split('|');
+                var keyId = parts[3];
+                decryptedContent = await _encryptionService.DecryptMessageAsync(message.Content, keyId, userId);
+            }
+            else
+            {
+                decryptedContent = message.Content;
+            }
+
+            // Highlight matching text
+            var highlightedContent = HighlightText(decryptedContent, query);
+            
+            searchResults.Add(new SearchResult(
+                message.ConversationId,
+                message.Conversation.Title,
+                message.Id,
+                message.Role,
+                decryptedContent,
+                message.CreatedAt,
+                highlightedContent
+            ));
+        }
+        catch (Exception ex)
+        {
+            // If decryption fails, skip this message from search results
+            Console.WriteLine($"Failed to decrypt message {message.Id} for search: {ex.Message}");
+        }
+    }
+
+    return searchResults.ToArray();
+}</code></pre>
+
+                <p>
+                    This implementation is smart about performance. It first queries the database for messages that
+                    MIGHT match (using SQL's <code>LIKE</code> operator on the encrypted content, which might get false
+                    positives), then decrypts each result and verifies it actually contains the search term. This is
+                    much faster than decrypting every message in the database.
+                </p>
+            </section>
+
+            <!-- JWT Token Service -->
+            <section class="section">
+                <h2>JWT Token Service - Authentication Implementation</h2>
+                <p>
+                    Authentication in modern web applications is typically done using JSON Web Tokens (JWT). The JWT
+                    Token Service is responsible for creating these tokens when users log in, and validating them on
+                    subsequent requests. Understanding this service is crucial because it's the foundation of the
+                    application's security.
+                </p>
+
+                <h3>What is a JWT?</h3>
+                <p>
+                    A JWT is a string that encodes three pieces of information: a header (describing the token type and
+                    algorithm), a payload (the actual claims/data), and a signature (proving the token hasn't been
+                    tampered with). It looks like this:
+                </p>
+                <pre><code>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjM0NTYiLCJ1c2VybmFtZSI6ImpvaG4iLCJyb2xlIjoiVXNlciJ9.xyz123abcSignature</code></pre>
+
+                <p>The three parts (separated by dots) are:
+                <ul>
+                    <li><strong>Header</strong>: <code>{"alg":"HS256","typ":"JWT"}</code> (base64 encoded)</li>
+                    <li><strong>Payload</strong>: <code>{"userId":"123456","username":"john","role":"User"}</code>
+                        (base64 encoded)</li>
+                    <li><strong>Signature</strong>: HMAC-SHA256 of the header and payload using a secret key</li>
+                </ul>
+                </p>
+
+                <h3>Service Implementation</h3>
+                <pre><code>public class JwtTokenService : IJwtTokenService
+{
+    private readonly JwtSettings _jwtSettings;
+    private readonly JwtSecurityTokenHandler _tokenHandler;
+
+    public JwtTokenService(JwtSettings jwtSettings)
+    {
+        _jwtSettings = jwtSettings;
+        _tokenHandler = new JwtSecurityTokenHandler();
+    }
+
+    public string GenerateToken(User user)
+    {
+        // Step 1: Create the signing key from our secret
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        // Step 2: Define the claims (data to embed in the token)
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim("jti", Guid.NewGuid().ToString())  // Unique token ID
+        };
+
+        // Step 3: Create the token
+        var token = new JwtSecurityToken(
+            issuer: _jwtSettings.Issuer,
+            audience: _jwtSettings.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationMinutes),
+            signingCredentials: credentials
+        );
+
+        // Step 4: Serialize to string
+        return _tokenHandler.WriteToken(token);
+    }
+}</code></pre>
+
+                <p>
+                    Here's what's happening step by step:
+                </p>
+
+                <ol>
+                    <li><strong>Create Signing Key</strong>: We convert our secret key (from configuration) into a
+                        <code>SymmetricSecurityKey</code>. This is used to sign the token. Anyone with this key can
+                        create valid tokens, so it MUST be kept secret.</li>
+                    <li><strong>Define Claims</strong>: Claims are the data we want to embed in the token. We include
+                        the user's ID, username, email, and role. These will be available on every request without
+                        hitting the database.</li>
+                    <li><strong>Set Expiration</strong>: Tokens have a limited lifetime (configured in
+                        <code>_jwtSettings.ExpirationMinutes</code>). After this time, the token is invalid and the user
+                        must login again.</li>
+                    <li><strong>Sign and Serialize</strong>: The token handler creates the JWT and signs it with our
+                        secret key. The result is a string that the client can store and send with future requests.</li>
+                </ol>
+
+                <h3>Token Validation</h3>
+                <p>
+                    When a request comes in with a JWT, we need to validate it. This checks that: (1) the signature is
+                    valid (proving we created the token), (2) it hasn't expired, and (3) the issuer and audience are
+                    correct (preventing tokens from other apps being used).
+                </p>
+
+                <pre><code>public ClaimsPrincipal? ValidateToken(string token)
+{
+    try
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,  // CHECK: Signature is valid
+            IssuerSigningKey = key,
+            ValidateIssuer = true,            // CHECK: Issuer matches
+            ValidIssuer = _jwtSettings.Issuer,
+            ValidateAudience = true,          // CHECK: Audience matches
+            ValidAudience = _jwtSettings.Audience,
+            ValidateLifetime = true,          // CHECK: Token not expired
+            ClockSkew = TimeSpan.Zero
+        };
+
+        var principal = _tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken validatedToken);
+        return principal;  // Contains all the claims from the token
+    }
+    catch
+    {
+        return null;  // Validation failed
+    }
+}</code></pre>
+
+                <p>
+                    If validation succeeds, we get a <code>ClaimsPrincipal</code> containing all the claims (user ID,
+                    username, role, etc.). The API layer uses this to know who is making the request. If validation
+                    fails (signature is wrong, token is expired, etc.), we return null, which triggers a 401
+                    Unauthorized response.
+                </p>
+            </section>
+
+            <!-- Service Collaboration -->
+            <section class="section">
+                <h2>How Services Work Together</h2>
+                <p>
+                    Services don't operate in isolation - they collaborate to implement complex workflows. Let's trace a
+                    complete user journey from login to sending a message, seeing how multiple services coordinate.
+                </p>
+
+                <h3>Complete Flow: Login to Sending a Message</h3>
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant Client
+                    participant AuthEndpoint
+                    participant UserService
+                    participant JwtService
+                    participant ChatEndpoint
+                    participant ConversationService
+                    participant MessageService
+                    participant EncryptionService
+                    participant DB
+
+                    Client->>AuthEndpoint: POST /api/auth/login<br />{username, password}
+                    AuthEndpoint->>UserService: GetUserByUsernameAsync(username)
+                    UserService->>DB: SELECT * FROM Users WHERE Username=?
+                    DB-->>UserService: User entity
+                    UserService-->>AuthEndpoint: User
+
+                    AuthEndpoint->>UserService: ValidatePasswordAsync(user, password)
+                    UserService->>UserService: BCrypt.Verify(password, hash)
+                    UserService-->>AuthEndpoint: true
+
+                    AuthEndpoint->>JwtService: GenerateToken(user)
+                    JwtService->>JwtService: Create JWT with claims
+                    JwtService-->>AuthEndpoint: JWT token
+                    AuthEndpoint-->>Client: 200 OK {token, user}
+
+                    Note over Client: User is now authenticated
+
+                    Client->>ChatEndpoint: POST /api/chat<br />Authorization: Bearer {token}
+                    ChatEndpoint->>JwtService: ValidateToken(token)
+                    JwtService-->>ChatEndpoint: ClaimsPrincipal (userId, username, role)
+
+                    ChatEndpoint->>ConversationService: GetConversationWithMessagesAsync(conversationId, userId)
+                    ConversationService->>DB: SELECT conversation + messages
+                    DB-->>ConversationService: Conversation + Messages
+                    ConversationService->>EncryptionService: DecryptMessageAsync(encrypted content)
+                    EncryptionService-->>ConversationService: Decrypted content
+                    ConversationService-->>ChatEndpoint: Conversation with history
+
+                    ChatEndpoint->>MessageService: SaveMessagesAsync(conversationId, messages)
+                    MessageService->>EncryptionService: EncryptMessageAsync(content)
+                    EncryptionService-->>MessageService: Encrypted content
+                    MessageService->>DB: INSERT INTO Messages
+                    DB-->>MessageService: Success
+
+                    ChatEndpoint-->>Client: 200 OK {response, tokens_used}
+                </div>
+
+                <p>
+                    This sequence diagram shows the complete journey. Notice how:
+                </p>
+
+                <ul>
+                    <li>The <strong>User Service</strong> validates credentials during login</li>
+                    <li>The <strong>JWT Service</strong> creates a token that the client stores</li>
+                    <li>On subsequent requests, the <strong>JWT Service</strong> validates the token, extracting the
+                        user's identity</li>
+                    <li>The <strong>Conversation Service</strong> retrieves message history, using the
+                        <strong>Encryption Service</strong> to decrypt messages</li>
+                    <li>The <strong>Message Service</strong> saves new messages, again using the <strong>Encryption
+                            Service</strong> to encrypt them before storage</li>
+                </ul>
+
+                <p>
+                    Each service has a single, clear responsibility, but they work together seamlessly. The API layer
+                    orchestrates these services, but it doesn't contain business logic itself - it just calls the right
+                    service methods in the right order.
+                </p>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+                <h2>Application Layer Best Practices</h2>
+                <p>
+                    Based on the patterns demonstrated in AIGS, here are the key principles for building a solid
+                    Application Layer:
+                </p>
+
+                <h3>1. Service Design Principles</h3>
+                <ul>
+                    <li><strong>Single Responsibility</strong>: Each service manages one area of functionality (users,
+                        conversations, templates, etc.). Don't create "god services" that do everything.</li>
+                    <li><strong>Interface-Based</strong>: Always define an interface first. This makes testing easier
+                        and keeps coupling low.</li>
+                    <li><strong>Dependency Injection</strong>: Services receive their dependencies through constructors,
+                        never creating them internally.</li>
+                    <li><strong>Async by Default</strong>: All database and I/O operations should be async to maintain
+                        scalability.</li>
+                </ul>
+
+                <h3>2. Data Transfer Objects (DTOs)</h3>
+                <ul>
+                    <li><strong>Separation from Entities</strong>: Never return domain entities directly from service
+                        methods. Use DTOs to control what data is exposed.</li>
+                    <li><strong>Purpose-Built</strong>: Create different DTOs for different use cases
+                        (<code>ConversationResponse</code> vs <code>ConversationWithMessagesResponse</code>).</li>
+                    <li><strong>Immutability</strong>: DTOs should be immutable - use records or readonly properties.
+                    </li>
+                </ul>
+
+                <h3>3. Error Handling</h3>
+                <ul>
+                    <li><strong>Nullable Returns</strong>: Use <code>?</code> to indicate that a method might return
+                        null. This makes the API contract explicit.</li>
+                    <li><strong>Bool for Success</strong>: For operations that might fail, return <code>bool</code> to
+                        indicate success/failure.</li>
+                    <li><strong>Exceptions for Exceptional Cases</strong>: Use exceptions for truly exceptional
+                        situations (database down, encryption key missing), not for normal flow control (user not
+                        found).</li>
+                </ul>
+
+                <h3>4. Security</h3>
+                <ul>
+                    <li><strong>Always Validate Ownership</strong>: When accessing resources, always check that the user
+                        owns them. The pattern <code>WHERE userId == requestUserId</code> appears in every query.</li>
+                    <li><strong>Hash, Never Encrypt Passwords</strong>: Passwords use BCrypt hashing (one-way), not
+                        encryption (two-way). You should NEVER be able to retrieve the original password.</li>
+                    <li><strong>Fail Secure</strong>: If authentication or authorization fails, deny access. If
+                        encryption fails, don't expose the raw data.</li>
+                </ul>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+                <h2>Next Steps</h2>
+                <div style="display: grid; gap: 1rem;">
+                    <a href="infrastructure-layer.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🏗️ Infrastructure Layer</div>
+                        <p class="card-description">Explore how the infrastructure layer implements the interfaces
+                            defined here.</p>
+                    </a>
+
+                    <a href="domain-models.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🗄️ Domain Models</div>
+                        <p class="card-description">See the entity definitions that services work with.</p>
+                    </a>
+
+                    <a href="architecture.html" class="card" style="text-decoration: none;">
+                        <div class="card-title">🏛️ Architecture Overview</div>
+                        <p class="card-description">Return to the architecture overview for the big picture.</p>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2024-2025 AIGS - AI Gateway Suite</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+
+</html>

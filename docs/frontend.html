@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIGS - Frontend Architecture Deep Dive</title>
+  <meta name="description"
+    content="Complete guide to the AIGS React frontend - components, state management, API integration, and routing">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+
+<body>
+  <header>
+    <div class="header-left">
+      <a href="index.html" class="logo">
+        <span>🚀</span>
+        <span>AIGS Documentation</span>
+      </a>
+    </div>
+    <div class="header-nav">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="overview.html" class="nav-link">Overview</a>
+      <a href="architecture.html" class="nav-link">Architecture</a>
+      <a href="frontend.html" class="nav-link active">Frontend</a>
+      <a href="api-reference.html" class="nav-link">API</a>
+    </div>
+    <button id="theme-toggle" class="theme-toggle">🌙 Dark</button>
+  </header>
+
+  <main>
+    <div class="container">
+      <div class="breadcrumbs">
+        <a href="index.html">Home</a>
+        <span class="breadcrumb-separator">/</span>
+        <a href="architecture.html">Architecture</a>
+        <span class="breadcrumb-separator">/</span>
+        <span>Frontend Architecture</span>
+      </div>
+
+      <h1>Frontend Architecture - React WebApp</h1>
+      <p class="lead" style="font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 2rem;">
+        The AIGS frontend is a modern single-page application built with React 18, TypeScript, and Tailwind CSS.
+        It provides a responsive, intuitive interface for conversing with local AI models. This chapter walks
+        you
+        through the entire frontend architecture - from high-level concepts to specific implementation details -
+        making it accessible whether you're a designer curious about how the UI works, or a developer ready to
+        contribute code.
+      </p>
+
+      <!-- LEVEL 1: CONCEPTUAL INTRODUCTION -->
+      <section class="section">
+        <h2>Understanding the Frontend</h2>
+
+        <h3>What is a Frontend?</h3>
+        <p>
+          When you open AIGS in your browser, everything you <em>see</em> and <em>interact with</em> is the
+          frontend. The buttons, text inputs, chat messages, conversation list - all of this runs in your
+          browser as HTML, CSS, and JavaScript. The frontend's job is to:
+        </p>
+
+        <ul>
+          <li><strong>Display Information</strong> - Show conversations, messages, user settings in a readable
+            format</li>
+          <li><strong>Accept Input</strong> - Capture what you type, which buttons you click, what you select
+          </li>
+          <li><strong>Communicate with Backend</strong> - Send your messages to the server, receive AI
+            responses</li>
+          <li><strong>Update in Real-Time</strong> - Show AI responses as they're generated, character by
+            character</li>
+        </ul>
+
+        <h3>Single Page Application (SPA)</h3>
+        <p>
+          AIGS is a Single Page Application, which might sound confusing because you can navigate to different
+          pages (chat, settings, admin). The "single page" refers to how the app works technically: your
+          browser loads the JavaScript code once, and then that code handles navigating between different
+          views without ever reloading the page. This makes the app feel fast and responsive, like a desktop
+          application rather than a traditional website.
+        </p>
+
+        <div class="card">
+          <div class="card-title">👥 Traditional Website vs SPA</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Aspect</th>
+                <th>Traditional Website</th>
+                <th>SPA (like AIGS)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Navigation</strong></td>
+                <td>Full page reload on each click</td>
+                <td>JavaScript swaps content, no reload</td>
+              </tr>
+              <tr>
+                <td><strong>Speed</strong></td>
+                <td>Slower (reloads everything)</td>
+                <td>Faster (only updates what changed)</td>
+              </tr>
+              <tr>
+                <td><strong>Experience</strong></td>
+                <td>Feels like clicking links</td>
+                <td>Feels like a desktop app</td>
+              </tr>
+              <tr>
+                <td><strong>Backend Communication</strong></td>
+                <td>Server renders HTML</td>
+                <td>JavaScript calls APIs for data</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Why React?</h3>
+        <p>
+          React is a JavaScript library for building user interfaces. It's developed by Facebook (Meta) and
+          used by millions of websites. AIGS uses React because:
+        </p>
+
+        <ul>
+          <li><strong>Component-Based</strong> - Break the UI into reusable pieces (like LEGO blocks)</li>
+          <li><strong>Reactive Updates</strong> - When data changes, the UI automatically updates</li>
+          <li><strong>Large Ecosystem</strong> - Thousands of free plugins and components available</li>
+          <li><strong>Type Safety with TypeScript</strong> - Catch errors before they reach users</li>
+          <li><strong>Great Developer Tools</strong> - Debugging and profiling tools built into browsers</li>
+        </ul>
+      </section>
+
+      <!-- LEVEL 2: TECHNOLOGY STACK -->
+      <section class="section">
+        <h2>Technology Stack</h2>
+        <p>
+          Building a modern, responsive AI interface requires a robust set of tools. We've chosen a stack that
+          prioritizes developer experience, type safety, and performance. This isn't just a random collection
+          of libraries; it's a cohesive ecosystem where each tool complements the others to create a seamless
+          development workflow and a high-quality user experience.
+        </p>
+
+        <h3>Core Technologies</h3>
+        <div class="card-grid">
+          <div class="card">
+            <div class="card-title">⚛️ React 18</div>
+            <p class="card-description">UI componentlibrary with automatic rendering, hooks for state
+              management, and concurrent features for better performance</p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">📘 TypeScript</div>
+            <p class="card-description">JavaScript with type annotations. Catches typos and logic errors at
+              compile time instead of at runtime</p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">⚡ Vite</div>
+            <p class="card-description">Lightning-fast build tool and dev server. Hot reload updates code in
+              browser within milliseconds</p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">🎨 Tailwind CSS</div>
+            <p class="card-description">Utility-first CSS framework. Style components by composing small
+              utility classes instead of writing custom CSS</p>
+          </div>
+        </div>
+
+        <h3>Supporting Libraries</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Library</th>
+              <th>Purpose</th>
+              <th>Example Use</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>React Router</strong></td>
+              <td>Client-side routing</td>
+              <td>Navigate between /chat, /settings, /admin without page reloads</td>
+            </tr>
+            <tr>
+              <td><strong>React Markdown</strong></td>
+              <td>Markdown rendering</td>
+              <td>Display AI responses with formatting (bold, italic, lists, code blocks)</td>
+            </tr>
+            <tr>
+              <td><strong>Syntax Highlighter</strong></td>
+              <td>Code syntax highlighting</td>
+              <td>Color-code programming language snippets in AI responses</td>
+            </tr>
+            <tr>
+              <td><strong>Lucide Icons</strong></td>
+              <td>Icon library</td>
+              <td>User icons, bot icons, settings icons, etc.</td>
+            </tr>
+            <tr>
+              <td><strong>MathJax</strong></td>
+              <td>Mathematical notation</td>
+              <td>Render LaTeX equations in messages</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>TypeScript Benefits in Action</h3>
+        <p>
+          Here's a concrete example of how TypeScript prevents bugs. Without TypeScript, you might write:
+        </p>
+
+        <pre><code>// JavaScript - No type checking
+const user = { name: "Alice", age: 30 };
+console.log(user.nmae);  // Typo! Prints "undefined" at runtime</code></pre>
+
+        <p>With TypeScript:</p>
+
+        <pre><code>// TypeScript - Compile-time error!
+interface User {
+  name: string;
+  age: number;
+}
+
+const user: User = { name: "Alice", age: 30 };
+console.log(user.nmae);  // ERROR: Property 'nmae' does not exist on type 'User'</code></pre>
+
+        <p>
+          The IDE shows a red squiggly line under <code>nmae</code> and won't let you build until you fix it.
+          This catches thousands of potential bugs before users ever see them.
+        </p>
+      </section>
+
+      <!-- LEVEL 3: APPLICATION ARCHITECTURE -->
+      <section class="section">
+        <h2>Application Architecture</h2>
+
+        <h3>Component Hierarchy</h3>
+        <p>
+          React applications are built from components - reusable UI pieces. Components can contain other
+          components, forming a tree structure. Here's how AIGS is organized:
+        </p>
+        <p>
+          React applications are built from components - reusable UI pieces that manage their own rendering and
+          logic. In AIGS, we've organized these components into a logical tree structure. At the top, we have
+          global providers that inject functionality (like authentication and theming) into the entire app.
+          Below that, the router decides which page to show. Finally, individual pages are composed of smaller,
+          focused components like lists, inputs, and buttons.
+        </p>
+        <p>
+          Visualizing this hierarchy helps understand how data flows through the application. Data typically
+          flows <em>down</em> (from parent to child via props), while actions flow <em>up</em> (via callback
+          functions).
+        </p>
+
+        <div class="mermaid">
+          graph TB
+          App[App.tsx<br />Root Component]
+
+          App --> AuthProvider[AuthProvider<br />Authentication State]
+          App --> AppearanceProvider[AppearanceProvider<br />Dark Mode State]
+
+          AuthProvider --> Router[React Router<br />URL-based Navigation]
+
+          Router --> LoginPage[LoginPage]
+          Router --> ChatPage[ChatPage]
+          Router --> SettingsPage[SettingsPage]
+          Router --> AdminPage[AdminPage]
+
+          ChatPage --> ConversationList[ConversationList<br />Sidebar]
+          ChatPage --> MessageList[MessageList<br />Chat Display]
+          ChatPage --> MessageInput[MessageInput<br />Input Field]
+          ChatPage --> ModelSelector[ModelSelector<br />Dropdown]
+
+          MessageList --> Markdown[ReactMarkdown]
+          MessageList --> SyntaxHighlighter[SyntaxHighlighter]
+
+          ConversationList --> ShareModal[ShareModal]
+
+          style App fill:#9c27b0,color:#fff
+          style AuthProvider fill:#2196f3,color:#fff
+          style ChatPage fill:#4caf50,color:#fff
+          style MessageList fill:#ff9800,color:#fff
+        </div>
+
+        <h3>App.tsx - The Root Component</h3>
+        <p>
+          Everything starts in <code>App.tsx</code>. This component wraps the entire application and sets up
+          the routing structure. Here's the complete implementation with explanations:
+        </p>
+
+        <pre><code>import { Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './contexts/AuthContext'
+import { AppearanceProvider } from './contexts/AppearanceContext'
+import { ProtectedRoute } from './components/ProtectedRoute'
+// ...import all pages
+
+function App() {
+  return (
+    &lt;AppearanceProvider&gt;  {/* Wraps app to provide dark mode state */}
+      &lt;AuthProvider&gt;  {/* Wraps app to provide auth state */}
+        &lt;div className="min-h-screen bg-gray-50 dark:bg-gray-900"&gt;
+          &lt;Routes&gt;
+            {/* Public routes - anyone can access */}
+            &lt;Route path="/login" element={&lt;LoginPage /&gt;} /&gt;
+            &lt;Route path="/register" element={&lt;RegisterPage /&gt;} /&gt;
+            
+            {/* Protected routes - must be logged in */}
+            &lt;Route 
+              path="/chat" 
+              element={
+                &lt;ProtectedRoute&gt;
+                  &lt;ChatPage /&gt;
+                &lt;/ProtectedRoute&gt;
+              } 
+            /&gt;
+            
+            {/* Admin routes - must be logged in AND have admin role */}
+            &lt;Route 
+              path="/admin" 
+              element={
+                &lt;ProtectedRoute requireAdmin&gt;
+                  &lt;AdminPage /&gt;
+                &lt;/ProtectedRoute&gt;
+              } 
+            /&gt;
+            
+            {/* Default route - redirect to chat */}
+            &lt;Route path="/" element={&lt;Navigate to="/chat" replace /&gt;} /&gt;
+          &lt;/Routes&gt;
+        &lt;/div&gt;
+      &lt;/AuthProvider&gt;
+    &lt;/AppearanceProvider&gt;
+  )
+}</code></pre>
+
+        <h3>Provider Pattern - Global State</h3>
+        <p>
+          Notice the <code>AuthProvider</code> and <code>AppearanceProvider</code> wrapping the entire app.
+          These are React Context providers - they make state available to any component in the tree without
+          having to pass props down manually. Think of it like a "global variable" that any component can
+          access.
+        </p>
+
+        <div class="mermaid">
+          graph TB
+          Provider[AuthProvider<br />user: logged in user data<br />login: function<br />logout: function]
+
+          ChatPage[ChatPage]
+          SettingsPage[SettingsPage]
+          AdminPage[AdminPage]
+          Header[Header]
+
+          Provider -.provides.-> ChatPage
+          Provider -.provides.-> SettingsPage
+          Provider -.provides.-> AdminPage
+          Provider -.provides.-> Header
+
+          ChatPage -->|useAuth hook| User1[Access user data]
+          Header -->|useAuth hook| User2[Show username<br />Logout button]
+
+          style Provider fill:#2196f3,color:#fff
+        </div>
+      </section>
+
+      <!-- LEVEL 4: STATE MANAGEMENT -->
+      <section class="section">
+        <h2>State Management with Context</h2>
+
+        <h3>AuthContext - Authentication State</h3>
+        <p>
+          Managing user authentication is one of the most critical parts of any frontend application. We need to
+          know <em>who</em> the user is, <em>if</em> they are logged in, and <em>what</em> permissions they
+          have. This information needs to be accessible from anywhere - the header needs it to show the
+          username, the router needs it to protect pages, and the chat needs it to load history.
+        </p>
+        <p>
+          Instead of passing this data down through every single component (a pain known as "prop drilling"),
+          we use React's Context API. The <code>AuthContext</code> acts as a single source of truth for all
+          authentication-related state. It handles the complexity of checking cookies, decoding tokens, and
+          managing the login/logout lifecycle, exposing a simple interface to the rest of the app.
+        </p>
+
+        <pre><code>// Define what data the context provides
+interface AuthContextType {
+  user: User | null;  // null = not logged in
+  login: (username: string, password: string) => Promise&lt;boolean&gt;;
+  register: (username: string, password: string, email: string) => Promise&lt;boolean&gt;;
+  logout: () => Promise&lt;void&gt;;
+  isLoading: boolean;  // true while checking auth status
+}
+
+// Create the context
+const AuthContext = createContext&lt;AuthContextType | undefined&gt;(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState&lt;User | null&gt;(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // On app load, check if user is already logged in
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      // Check for JWT token in cookies
+      const token = getCookie('access_token');
+      
+      if (token) {
+        // Decode JWT to extract user information
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        
+        // Check if token expired
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < now) {
+          setUser(null);
+          return;
+        }
+        
+        // Extract user data from JWT claims
+        const userData = {
+          id: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'],
+          username: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'],
+          email: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'],
+          role: payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'],
+          createdAt: new Date(payload.iat * 1000).toISOString()
+        };
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (username: string, password: string): Promise&lt;boolean&gt; => {
+    try {
+      const response = await api.login(username, password);
+      
+      if (response && response.success === true) {
+        if (response.user) {
+          setUser(response.user);
+        } else {
+          await checkAuthStatus();  // Re-check to get user from JWT
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
+    }
+  };
+
+  const logout = async (): Promise&lt;void&gt; => {
+    try {
+      await api.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  // Make this available to all child components
+  return (
+    &lt;AuthContext.Provider value={{ user, login, register, logout, isLoading }}&gt;
+      {children}
+    &lt;/AuthContext.Provider&gt;
+  );
+}</code></pre>
+
+        <h3>Using AuthContext in Components</h3>
+        <p>
+          Any component can access the authentication state using the <code>useAuth</code> hook:
+        </p>
+
+        <pre><code>// Custom hook to access auth context
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+// Example usage in a component
+function Header() {
+  const { user, logout } = useAuth();  // Get current user and logout function
+  
+  return (
+    &lt;div&gt;
+      &lt;span&gt;Welcome, {user?.username}!&lt;/span&gt;
+      &lt;button onClick={logout}&gt;Logout&lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+        <h3>JWT Token Handling</h3>
+        <p>
+          The frontend stores the JWT token in an HTTP-only cookie (set by the backend). On app load, it
+          decodes the JWT to extract user information. The token contains "claims" - key-value pairs with user
+          data. The claim names are verbose because .NET uses full XML namespace URIs, but they map to simple
+          concepts:
+        </p>
+
+        <ul>
+          <li><code>nameidentifier</code> → User ID</li>
+          <li><code>name</code> → Username</li>
+          <li><code>emailaddress</code> → Email</li>
+          <li><code>role</code> → Role (User/Admin)</li>
+          <li><code>exp</code> → Expiration timestamp</li>
+        </ul>
+      </section>
+
+      <!-- LEVEL 5: CORE COMPONENTS -->
+      <section class="section">
+        <h2>Core Components Deep Dive</h2>
+        <p>
+          While the architecture provides the skeleton, the core components provide the muscle. These are the
+          workhorses of the application, handling the complex interactions that users engage with every day.
+          We'll look at two critical components: the <code>ConversationList</code> which manages navigation,
+          and the <code>MessageList</code> which handles the rich display of chat content.
+        </p>
+
+        <h3>ConversationList - Sidebar Component</h3>
+        <p>
+          The <code>ConversationList</code> is more than just a list of links. It's a fully interactive
+          component that allows users to manage their chat history. It needs to handle selection states,
+          inline editing for renaming, and confirmation dialogs for deletion - all while keeping the UI
+          responsive and clean.
+        </p>
+
+        <pre><code>interface ConversationListProps {
+  conversations: Conversation[];  // Array of conversations to display
+  currentConversation: Conversation | null;  // Currently selected conversation
+  onConversationSelect: (conversation: Conversation) => void;  // Callback when user clicks
+  onConversationRename: (conversationId: string, newTitle: string) => Promise&lt;void&gt;;
+  onConversationDelete: (conversationId: string) => Promise&lt;void&gt;;
+}
+
+export function ConversationList({ 
+  conversations, 
+  currentConversation, 
+  onConversationSelect,
+  onConversationRename,
+  onConversationDelete
+}: ConversationListProps) {
+  const [editingId, setEditingId] = useState&lt;string | null&gt;(null);
+  const [editTitle, setEditTitle] = useState('');
+
+  const handleEditStart = (conversation: Conversation) => {
+    setEditingId(conversation.id);
+    setEditTitle(conversation.title);
+  };
+
+  const handleEditSave = async () => {
+    if (editingId && editTitle.trim()) {
+      await onConversationRename(editingId, editTitle.trim());
+      setEditingId(null);
+      setEditTitle('');
+    }
+  };
+
+  const handleDelete = async (conversation: Conversation) => {
+    if (window.confirm(`Delete "${conversation.title}"?`)) {
+      await onConversationDelete(conversation.id);
+    }
+  };
+
+  return (
+    &lt;div className="flex-1 overflow-y-auto"&gt;
+      {conversations.map((conversation) => (
+        &lt;div
+          key={conversation.id}
+          className={`p-3 rounded-lg ${
+            currentConversation?.id === conversation.id
+              ? 'bg-blue-100 dark:bg-blue-900/30'  // Highlight if selected
+              : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        &gt;
+          {/* Show input field if editing, otherwise show title */}
+          {editingId === conversation.id ? (
+            &lt;input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleEditSave}  // Save when clicking outside
+              autoFocus
+            /&gt;
+          ) : (
+            &lt;p onClick={() => onConversationSelect(conversation)}&gt;
+              {conversation.title}
+            &lt;/p&gt;
+          )}
+          
+          {/* Action buttons */}
+          &lt;button onClick={() => handleEditStart(conversation)}&gt;Rename&lt;/button&gt;
+          &lt;button onClick={() => handleDelete(conversation)}&gt;Delete&lt;/button&gt;
+        &lt;/div&gt;
+      ))}
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+        <h3>MessageList - Chat Display Component</h3>
+        <p>
+          The <code>MessageList</code> component renders all messages in a conversation. It's one of the most
+          complex components because it handles Markdown, LaTeX math, code syntax highlighting, file
+          attachments, and more. Key features:
+        </p>
+
+        <ul>
+          <li><strong>Markdown Rendering</strong> - Converts **bold**, *italic*, [links], etc. to HTML</li>
+          <li><strong>Code Blocks</strong> - Syntax highlighting for programming languages</li>
+          <li><strong>Math Equations</strong> - Renders LaTeX formulas using MathJax</li>
+          <li><strong>File Attachments</strong> - Displays uploaded images and text files</li>
+          <li><strong>Auto-Scroll</strong> - Scrolls to bottom when new messages arrive</li>
+        </ul>
+
+        <pre><code>export function MessageList({ messages }: MessageListProps) {
+  const messagesEndRef = useRef&lt;HTMLDivElement&gt;(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const getMessageIcon = (role: string) => {
+    switch (role) {
+      case 'user':
+        return &lt;User className="h-5 w-5 text-blue-600" /&gt;;
+      case 'assistant':
+        return &lt;Bot className="h-5 w-5 text-gray-600" /&gt;;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    &lt;div className="flex-1 overflow-y-auto p-4 space-y-4"&gt;
+      {messages.length === 0 ? (
+        &lt;div className="flex items-center justify-center h-full"&gt;
+          &lt;p&gt;Start a conversation by typing a message below&lt;/p&gt;
+        &lt;/div&gt;
+      ) : (
+        &lt;&gt;
+          {messages.map((message) => (
+            &lt;div key={message.id} className="flex space-x-3"&gt;
+              &lt;div className="flex-shrink-0"&gt;
+                {getMessageIcon(message.role)}
+              &lt;/div&gt;
+              &lt;div className="flex-1"&gt;
+                {/* Render content as Markdown */}
+                &lt;ReactMarkdown 
+                  remarkPlugins={[remarkMath, remarkGfm]} 
+                  components={markdownComponents}
+                &gt;
+                  {message.content}
+                &lt;/ReactMarkdown&gt;
+                
+                {/* Show timestamp */}
+                &lt;div className="mt-2 text-xs text-gray-500"&gt;
+                  {message.timestamp.toLocaleTimeString()}
+                &lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          ))}
+          &lt;div ref={messagesEndRef} /&gt; {/* Scroll target */}
+        &lt;/&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+        <h3>Syntax Highlighting Configuration</h3>
+        <p>
+          Code blocks in messages are automatically highlighted using <code>react-syntax-highlighter</code>.
+          The component detects the language from the markdown fence identifier:
+        </p>
+
+        <pre><code>// In markdown components configuration
+code({ className, children, ...props }: any) {
+  const match = /language-(\w+)/.exec(className || '');
+  
+  // If it's a code block (not inline) and has a language specified
+  if (!props.inline && match) {
+    return (
+      &lt;SyntaxHighlighter 
+        style={isDarkMode ? vscDarkPlus : tomorrow} 
+        language={match[1]}  // e.g., "python", "javascript"
+        PreTag="div"
+      &gt;
+        {String(children).replace(/\n$/, '')}
+      &lt;/SyntaxHighlighter&gt;
+    );
+  }
+  
+  // Inline code: just style with background
+  return (
+    &lt;code className="bg-gray-100 dark:bg-gray-700 px-1 rounded"&gt;
+      {children}
+    &lt;/code&gt;
+  );
+}</code></pre>
+      </section>
+
+      <!-- LEVEL 6: API INTEGRATION -->
+      <section class="section">
+        <h2>API Integration</h2>
+
+        <h3>Fetch API for HTTP Requests</h3>
+        <p>
+          The frontend communicates with the backend via HTTP requests. AIGS uses the built-in
+          <code>fetch</code> API (no libraries needed). All API calls are centralized in an
+          <code>api.ts</code>
+          module:
+        </p>
+
+        <pre><code>const API_BASE = 'http://localhost:5000';
+
+export const api = {
+  // Login: POST /api/auth/login
+  login: async (username: string, password: string) => {
+    const response = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',  // Send cookies
+      body: JSON.stringify({ username, password })
+    });
+    return response.json();
+  },
+
+  // Get conversations: GET /api/conversations
+  getConversations: async () => {
+    const response = await fetch(`${API_BASE}/api/conversations`, {
+      method: 'GET',
+      credentials: 'include'  // Send JWT cookie
+    });
+    return response.json();
+  },
+
+  // Send chat message: POST /api/chat
+  sendMessage: async (messages, conversationId) => {
+    const response = await fetch(`${API_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ messages, conversationId })
+    });
+    return response;  // Return response object for streaming
+  }
+};</code></pre>
+
+        <h3>Handling Streaming Responses</h3>
+        <p>
+          Chat responses use Server-Sent Events (SSE) streaming. The frontend reads the response stream chunk
+          by chunk and updates the UI in real-time:
+        </p>
+
+        <pre><code>const handleSendMessage = async (content: string) => {
+  // Add user message to UI immediately
+  const userMessage = {
+    id: crypto.randomUUID(),
+    role: 'user',
+    content,
+    timestamp: new Date()
+  };
+  setMessages([...messages, userMessage]);
+
+  // Start assistant response
+  const assistantMessage = {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: '',  // Empty initially
+    timestamp: new Date()
+  };
+  setMessages(prev => [...prev, assistantMessage]);
+
+  // Call API for streaming response
+  const response = await api.sendMessage(messages, conversationId);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  let assistantContent = '';
+  
+  // Read stream chunk by chunk
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);  // Remove "data: " prefix
+        if (data === '[DONE]') break;
+
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices[0]?.delta?.content || '';
+          assistantContent += delta;
+
+          // Update UI with new content
+          setMessages(prev => prev.map(msg =>
+            msg.id === assistantMessage.id
+              ? { ...msg, content: assistantContent }
+              : msg
+          ));
+        } catch (e) {
+          console.error('Failed to parse SSE data:', e);
+        }
+      }
+    }
+  }
+};</code></pre>
+
+        <h3>Error Handling Pattern</h3>
+        <p>
+          All API calls include error handling with try-catch blocks and user-friendly error messages:
+        </p>
+
+        <pre><code>try {
+  const response = await api.sendMessage(messages, conversationId);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  // Process response...
+} catch (error) {
+  console.error('Failed to send message:', error);
+  // Show error to user (could use toast notification)
+  alert('Failed to send message. Please try again.');
+  
+  // Optionally: Remove the failed message from UI
+  setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+}</code></pre>
+      </section>
+
+      <!-- LEVEL 7: STYLING ARCHITECTURE -->
+      <section class="section">
+        <h2>Styling with Tailwind CSS</h2>
+
+        <h3>Utility-First CSS Approach</h3>
+        <p>
+          Instead of writing custom CSS classes, Tailwind provides hundreds of small, single-purpose utility
+          classes. You combine them directly in your HTML/JSX to style elements:
+        </p>
+
+        <pre><code>// Traditional CSS approach
+&lt;div className="conversation-card"&gt;...&lt;/div&gt;
+
+// In styles.css:
+.conversation-card {
+  padding: 12px;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+// Tailwind approach - no custom CSS needed!
+&lt;div className="p-3 rounded-lg bg-white shadow-sm"&gt;...&lt;/div&gt;</code></pre>
+
+        <h3>Dark Mode Implementation</h3>
+        <p>
+          Tailwind has built-in dark mode support. Prefix any utility with <code>dark:</code> to apply it only
+          in dark mode:
+        </p>
+
+        <pre><code>&lt;div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"&gt;
+  This has white background in light mode, dark gray in dark mode
+&lt;/div&gt;</code></pre>
+
+        <p>
+          The <code>AppearanceContext</code> manages dark mode by toggling a class on the root HTML element:
+        </p>
+
+        <pre><code>const toggleDarkMode = () => {
+  const html = document.documentElement;
+  if (html.classList.contains('dark')) {
+    html.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
+  } else {
+    html.classList.add('dark');
+    localStorage.setItem('theme', 'dark');
+  }
+};</code></pre>
+
+        <h3>Responsive Design</h3>
+        <p>
+          Tailwind includes responsive breakpoint prefixes. Use <code>sm:</code>, <code>md:</code>,
+          <code>lg:</code> to apply styles at different screen sizes:
+        </p>
+
+        <pre><code>&lt;div className="w-full md:w-1/2 lg:w-1/3"&gt;
+  {/* Full width on mobile, half width on tablets, third width on desktop */}
+&lt;/div&gt;</code></pre>
+      </section>
+
+      <!-- NEXT STEPS -->
+      <section class="section">
+        <h2>Next Steps</h2>
+        <div style="display: grid; gap: 1rem;">
+          <a href="integration-flows.html" class="card" style="text-decoration: none;">
+            <div class="card-title">🔄 Integration Flows</div>
+            <p class="card-description">End-to-end tracing of complete user journeys from frontend click to
+              backend and back</p>
+          </a>
+
+          <a href="application-layer.html" class="card" style="text-decoration: none;">
+            <div class="card-title">📦 Application Layer</div>
+            <p class="card-description">Learn how backend services orchestrate business logic and coordinate
+              workflows</p>
+          </a>
+
+          <a href="infrastructure-layer.html" class="card" style="text-decoration: none;">
+            <div class="card-title">🔧 Infrastructure Layer</div>
+            <p class="card-description">Database access, repositories, encryption, and external API
+              integration</p>
+          </a>
+
+          <a href="api-reference.html" class="card" style="text-decoration: none;">
+            <div class="card-title">📡 API Reference</div>
+            <p class="card-description">Complete API endpoint documentation with request/response examples
+            </p>
+          </a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2024-2025 AIGS - AI Gateway Suite. Built with ❤️ for local-first AI.</p>
+  </footer>
+
+  <script src="scripts.js"></script>
+</body>
+
+</html>
