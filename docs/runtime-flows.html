@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway Suite – Runtime Flows</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.7; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    ol { margin-top: 0; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Runtime Flows</h1>
+  <p>Detailed, stepwise execution traces for the key end-to-end scenarios of the AI Gateway Suite. See the <a style="color:white; text-decoration: underline;" href="full-documentation.html">Documentation Hub</a> for navigation.</p>
+  <nav>
+    <a href="#auth">Authentication</a>
+    <a href="#conversation">Conversation Lifecycle</a>
+    <a href="#chat">Chat Completion</a>
+    <a href="#health">Health & Metrics</a>
+  </nav>
+</header>
+<main>
+  <section id="auth">
+    <h2>Authentication Flow (JWT)</h2>
+    <ol>
+      <li><strong>WebApp</strong> presents login/register UI and posts credentials to <code>POST /auth</code> exposed by <span class="pill">Gateway.Api</span>.</li>
+      <li><strong>Gateway.Api</strong> binds the payload to application DTOs and triggers validation.</li>
+      <li><strong>Gateway.Application</strong> verifies credentials via injected <span class="pill">Gateway.Domain</span> services and repository ports.</li>
+      <li><strong>Gateway.Infrastructure</strong> repository queries the SQLite database for the user and validates the password hash.</li>
+      <li>On success, <strong>Gateway.Api</strong> issues a JWT (using configured signing key) and returns it to the WebApp; failures propagate as validation or auth errors.</li>
+      <li><strong>WebApp</strong> stores the JWT (e.g., in memory/local storage) and attaches it to subsequent API calls.</li>
+    </ol>
+  </section>
+
+  <section id="conversation">
+    <h2>Conversation Lifecycle</h2>
+    <ol>
+      <li><strong>WebApp</strong> requests existing conversations via <code>GET /conversations</code> (JWT protected).</li>
+      <li><strong>Gateway.Api</strong> authenticates the token and forwards to application handlers.</li>
+      <li><strong>Gateway.Application</strong> fetches data through repository ports, applying ownership filters tied to the authenticated user.</li>
+      <li><strong>Gateway.Infrastructure</strong> executes queries against SQLite and returns DTOs.</li>
+      <li><strong>WebApp</strong> renders the list and allows creation via <code>POST /conversations</code>, which repeats the same path and persists the new record.</li>
+      <li>Deletion (<code>DELETE /conversations/{id}</code>) or renaming follows the same chain with additional authorization checks in the application layer.</li>
+    </ol>
+  </section>
+
+  <section id="chat">
+    <h2>Chat Completion Flow</h2>
+    <ol>
+      <li><strong>WebApp</strong> sends a message to <code>POST /chat</code> with the conversation id and prompt.</li>
+      <li><strong>Gateway.Api</strong> validates JWT, binds the request, and invokes the chat use case.</li>
+      <li><strong>Gateway.Application</strong> loads the conversation context, appends the user message, and orchestrates a call to the LLM port.</li>
+      <li><strong>Gateway.Infrastructure</strong> converts the request to an OpenAI-compatible payload for LM Studio (default) and issues the HTTP call.</li>
+      <li>Streaming or full response is returned to <strong>Gateway.Application</strong>, which persists the assistant message through repository ports.</li>
+      <li><strong>Gateway.Api</strong> streams or returns the final response to the WebApp, which updates the chat UI.</li>
+    </ol>
+  </section>
+
+  <section id="health">
+    <h2>Health, Metrics, and Operations</h2>
+    <ol>
+      <li><strong>Health Checks:</strong> <code>/health/live</code> (process liveness) and <code>/health/ready</code> (dependencies) are exposed by <span class="pill">Gateway.Api</span> or <span class="pill">SimpleGateway</span>.</li>
+      <li><strong>Metrics:</strong> Prometheus metrics at <code>/metrics</code> capture request counts, latencies, and error rates when enabled.</li>
+      <li><strong>Database Migrations:</strong> For the layered stack, run <code>dotnet ef database update --project src/Gateway.Infrastructure --startup-project src/Gateway.Api</code>; for SimpleGateway, run <code>dotnet ef database update</code> within <code>src/SimpleGateway</code>.</li>
+      <li><strong>Reverse Proxy Path:</strong> Caddy/Nginx serve static WebApp assets and proxy API requests to the Kestrel backend, preserving <code>/api</code> routing.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

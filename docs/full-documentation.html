@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway Suite – Documentation Hub</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 32px 48px; }
+    main { padding: 32px 48px 64px; max-width: 1200px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+    nav a { color: #e0f2fe; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; box-shadow: 0 8px 20px rgba(15,23,42,0.04); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>AI Gateway Suite – Documentation Hub</h1>
+  <p>Central entry point for the full English documentation set. Use the quick links below to jump to the dedicated pages for architecture, module internals, runtime flows, and operations/development practices.</p>
+  <nav>
+    <a href="#overview">Overview</a>
+    <a href="#structure">Repository Layout</a>
+    <a href="#pages">Documentation Pages</a>
+    <a href="#quick-start">Quick Start</a>
+  </nav>
+</header>
+<main>
+  <section id="overview">
+    <h2>Solution Overview</h2>
+    <p>The AI Gateway Suite (AIGS) provides a locally runnable AI stack composed of a React web application, an ASP.NET Core backend, and optional reverse proxies via Caddy or Nginx. Two deployment shapes are available: a layered architecture (<span class="pill">Gateway.Api</span>, <span class="pill">Gateway.Application</span>, <span class="pill">Gateway.Domain</span>, <span class="pill">Gateway.Infrastructure</span>, <span class="pill">WebApp</span>) and a self-contained <span class="pill">SimpleGateway</span> variant with built-in migrations, SQLite, and admin flows.</p>
+  </section>
+
+  <section id="structure">
+    <h2>Repository Layout</h2>
+    <pre><code>src/
+├─ Gateway.Api/             # Minimal APIs, DI wiring, health/metrics
+├─ Gateway.Application/     # Use-cases, DTOs, validators, orchestration
+├─ Gateway.Domain/          # Entities, value objects, interfaces (ports)
+├─ Gateway.Infrastructure/  # EF Core, repositories, external LLM adapters
+├─ SimpleGateway/           # Monolith alternative with SQLite + admin
+└─ WebApp/                  # React frontend (Vite, Tailwind)
+
+tests/
+├─ Gateway.UnitTests/
+└─ Gateway.IntegrationTests/
+
+deploy/
+├─ caddy/
+├─ nginx/
+└─ systemd/
+</code></pre>
+    <p>Top-level scripts (<code>setup-local.sh</code>, <code>start.sh</code>, <code>start-simple.sh</code>, and their stop/status counterparts) assist with bootstrapping and lifecycle management.</p>
+  </section>
+
+  <section id="pages">
+    <h2>Documentation Pages</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3><a href="architecture-overview.html">Architecture Overview</a></h3>
+        <p>Explains system shapes, deployment modes, cross-cutting concerns, and how reverse proxies and data stores integrate.</p>
+      </div>
+      <div class="card">
+        <h3><a href="module-deep-dive.html">Module Deep Dive</a></h3>
+        <p>Breaks down every backend/frontend module with code-level responsibilities, key classes, and collaboration patterns.</p>
+      </div>
+      <div class="card">
+        <h3><a href="runtime-flows.html">Runtime Flows</a></h3>
+        <p>Shows end-to-end sequences for authentication, conversations, chat with LLM backends, and operational endpoints.</p>
+      </div>
+      <div class="card">
+        <h3><a href="operations-and-development.html">Operations & Development</a></h3>
+        <p>Covers setup, configuration, migrations, testing strategy, monitoring, and contribution guidelines.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="quick-start">
+    <h2>Quick Start</h2>
+    <h3>SimpleGateway (all-in-one)</h3>
+    <pre><code>./setup-local.sh
+./start-simple.sh
+# visit http://localhost via Caddy
+</code></pre>
+    <h3>Layered stack (Gateway.Api + WebApp)</h3>
+    <pre><code>dotnet run --project src/Gateway.Api
+cd src/WebApp && npm install && npm run dev
+# API at http://localhost:5000, frontend at http://localhost:5173
+</code></pre>
+  </section>
+</main>
+</body>
+</html>

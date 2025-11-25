@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway Suite – Operations & Development</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.7; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    ul { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Operations & Development</h1>
+  <p>Comprehensive guidance for running, configuring, testing, and extending the AI Gateway Suite. Linked from the <a style="color:white; text-decoration: underline;" href="full-documentation.html">Documentation Hub</a>.</p>
+  <nav>
+    <a href="#setup">Setup & Boot</a>
+    <a href="#config">Configuration</a>
+    <a href="#migrations">Migrations</a>
+    <a href="#testing">Testing</a>
+    <a href="#monitoring">Monitoring & Security</a>
+    <a href="#contrib">Contribution Tips</a>
+  </nav>
+</header>
+<main>
+  <section id="setup">
+    <h2>Setup & Boot</h2>
+    <h3>SimpleGateway</h3>
+    <pre><code>./setup-local.sh
+./start-simple.sh
+# proxy + backend + frontend combined
+</code></pre>
+    <h3>Layered Stack</h3>
+    <pre><code>dotnet run --project src/Gateway.Api
+cd src/WebApp && npm install && npm run dev
+</code></pre>
+    <p>Stop scripts: <code>stop.sh</code> / <code>stop-simple.sh</code>; status scripts: <code>status.sh</code> / <code>status-simple.sh</code>.</p>
+  </section>
+
+  <section id="config">
+    <h2>Configuration</h2>
+    <table>
+      <tr><th>Component</th><th>Files</th><th>Key Settings</th></tr>
+      <tr><td>Gateway.Api</td><td><code>src/Gateway.Api/appsettings*.json</code></td><td>JWT keys, connection strings, LLM base URL</td></tr>
+      <tr><td>SimpleGateway</td><td><code>src/SimpleGateway/appsettings*.json</code></td><td>SQLite path, JWT keys, proxy paths</td></tr>
+      <tr><td>WebApp</td><td><code>src/WebApp/.env*</code></td><td>API base URL, feature flags</td></tr>
+      <tr><td>Deployment</td><td><code>deploy/aigs.env</code></td><td>Production-ready environment variables</td></tr>
+      <tr><td>Proxy</td><td><code>Caddyfile</code>, <code>deploy/caddy/Caddyfile</code>, <code>deploy/nginx/nginx.conf</code></td><td>Static hosting, <code>/api</code> routing, TLS</td></tr>
+    </table>
+    <p>Environment variables override JSON/app files. Secrets (JWT keys, DB paths) should be injected via environment or secret stores in production.</p>
+  </section>
+
+  <section id="migrations">
+    <h2>Database Migrations</h2>
+    <h3>Layered Stack</h3>
+    <pre><code>dotnet ef migrations add <Name> \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+
+dotnet ef database update \
+  --project src/Gateway.Infrastructure \
+  --startup-project src/Gateway.Api
+</code></pre>
+    <h3>SimpleGateway</h3>
+    <pre><code>cd src/SimpleGateway
+dotnet ef migrations add <Name>
+dotnet ef database update
+</code></pre>
+  </section>
+
+  <section id="testing">
+    <h2>Testing Strategy</h2>
+    <ul>
+      <li><strong>Unit:</strong> <code>dotnet test tests/Gateway.UnitTests</code> for domain and application rules using mocked ports.</li>
+      <li><strong>Integration:</strong> <code>dotnet test tests/Gateway.IntegrationTests</code> to validate API routing, validation, and persistence.</li>
+      <li><strong>Full Suite:</strong> <code>dotnet test</code> to run everything.</li>
+      <li><strong>Frontend (suggested):</strong> Add Vitest for component tests and Playwright for end-to-end coverage of chat/auth flows.</li>
+    </ul>
+  </section>
+
+  <section id="monitoring">
+    <h2>Monitoring & Security</h2>
+    <ul>
+      <li><strong>Health:</strong> <code>/health/live</code> (liveness) and <code>/health/ready</code> (readiness) for probes.</li>
+      <li><strong>Metrics:</strong> <code>/metrics</code> for Prometheus scraping (enable in production to track latency, throughput, errors).</li>
+      <li><strong>Security:</strong> JWT auth on protected endpoints, TLS termination at the proxy, and CORS defaults aligning with development origins.</li>
+      <li><strong>Backups:</strong> SQLite files can be snapshotted; integrate cron/systemd timers to copy DB files for retention.</li>
+    </ul>
+  </section>
+
+  <section id="contrib">
+    <h2>Contribution Tips</h2>
+    <ul>
+      <li>Follow the layering rules: API ↔ Application ↔ Domain ↔ Infrastructure to maintain separation of concerns.</li>
+      <li>Prefer strongly typed options bound from configuration; avoid scattering <code>Environment.GetEnvironmentVariable</code> calls.</li>
+      <li>Keep validation near the application layer and invariants in the domain layer.</li>
+      <li>Write unit tests for new domain rules and integration tests for new endpoints; keep fixtures under <code>tests/</code>.</li>
+      <li>Run <code>npm run build</code> in <code>src/WebApp</code> before deploying a new frontend bundle.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

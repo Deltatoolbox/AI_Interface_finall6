@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Testing Modules Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Testing Modules Deep Dive</h1>
+  <p>How the solution is tested end-to-end: unit tests for domain/application logic and integration tests for the HTTP surface. Guidance for adding more coverage and keeping fixtures healthy.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-api-deep-dive.html">Gateway.Api</a>
+    <a href="gateway-application-deep-dive.html">Gateway.Application</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>tests/
+├─ Gateway.UnitTests/
+│  ├─ Builders/           # Entity/value object builders for expressive tests
+│  ├─ Domain/             # Entity and policy tests
+│  ├─ Application/        # Use case tests with mocked ports
+│  └─ TestDoubles/        # Fakes/mocks for repositories, clock, ID generator, LLM connector
+└─ Gateway.IntegrationTests/
+   ├─ Api/                # HTTP-level tests hitting minimal APIs
+   ├─ Fixtures/           # Test server, seeded database, auth helpers
+   └─ Data/               # Sample payloads and expected responses
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Unit Testing Strategy</h2>
+    <ul>
+      <li><strong>Scope:</strong> Focus on domain invariants and application logic without touching the database.</li>
+      <li><strong>Test Doubles:</strong> Use in-memory repositories and fake connectors to validate behavior (ownership checks, model validation, retention rules).</li>
+      <li><strong>Determinism:</strong> Mock <code>IClock</code> and <code>IIdGenerator</code> to control timestamps and IDs in assertions.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Integration Testing Strategy</h2>
+    <ul>
+      <li><strong>Server Harness:</strong> Spins up the minimal API with an in-memory SQLite database or a temporary file to mimic production wiring.</li>
+      <li><strong>Auth Helpers:</strong> Uses registration/login endpoints to obtain JWTs for subsequent calls.</li>
+      <li><strong>Coverage:</strong> Exercises conversation lifecycle, chat submission, validation failures, and health endpoints.</li>
+      <li><strong>Assertions:</strong> Validate HTTP status codes, response shapes, and side effects (DB rows, message ordering).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Operational Checks</h2>
+    <ul>
+      <li><strong>Health/Readiness:</strong> Tests for <code>/health/live</code> and <code>/health/ready</code> ensure probes reflect DB connectivity.</li>
+      <li><strong>Metrics:</strong> Optional tests can scrape <code>/metrics</code> to validate Prometheus exposition when enabled.</li>
+      <li><strong>Resilience:</strong> Simulate transient connector failures to confirm retries and error surfaces are user-friendly.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Adding New Tests</h2>
+    <ul>
+      <li>Introduce builders for new entities/value objects to keep setup expressive.</li>
+      <li>Prefer arranging data through public APIs in integration tests to mirror real usage.</li>
+      <li>Update CI scripts and <code>docs/operations-and-development.html</code> when adding new test commands or environments.</li>
+      <li>Ensure tests remain hermetic: avoid relying on external LLM endpoints by faking connectors during CI.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

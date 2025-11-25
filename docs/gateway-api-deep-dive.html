@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gateway.Api Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Gateway.Api Deep Dive</h1>
+  <p>The HTTP edge for the layered stack. Hosts minimal APIs, composes middleware, configures dependency injection, and exposes health/metrics endpoints consumed by reverse proxies.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-application-deep-dive.html">Gateway.Application</a>
+    <a href="gateway-domain-deep-dive.html">Gateway.Domain</a>
+    <a href="gateway-infrastructure-deep-dive.html">Infrastructure</a>
+    <a href="webapp-deep-dive.html">WebApp</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>src/Gateway.Api/
+├─ Program.cs            # Minimal API entry point, DI, middleware, endpoint mapping
+├─ appsettings*.json     # API-specific configuration and feature toggles
+├─ Auth/                 # JWT setup, authentication handlers
+├─ Endpoints/            # Minimal API endpoint definitions and route grouping
+├─ Extensions/           # IServiceCollection and WebApplicationBuilder helpers
+└─ Observability/        # Metrics, logging, correlation ID helpers
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Composition Root</h2>
+    <ul>
+      <li><strong>Dependency Injection:</strong> Registers <code>Gateway.Application</code> handlers, <code>Gateway.Infrastructure</code> repositories/clients, and shared cross-cutting services (clock, ID generators).</li>
+      <li><strong>Configuration Binding:</strong> Binds <code>appsettings.json</code> and environment variables into options objects for DB connection strings, JWT secrets, proxy base URLs, and OpenAI-compatible endpoints.</li>
+      <li><strong>Middleware Pipeline:</strong> CORS, forwarded headers, HTTPS redirection (for reverse proxies), request logging, exception handling, JWT authentication/authorization, and metrics.</li>
+      <li><strong>Health & Metrics:</strong> <code>/health/live</code>, <code>/health/ready</code>, and optional <code>/metrics</code> (Prometheus) endpoints for platform liveness/readiness.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Endpoints & Contracts</h2>
+    <table>
+      <thead>
+        <tr><th>Route</th><th>Purpose</th><th>DTOs</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>/api/auth/register</code></td><td>Create user</td><td>RegisterRequest, AuthResponse</td><td>Validates email/password, hashes password, issues JWT.</td></tr>
+        <tr><td><code>/api/auth/login</code></td><td>Authenticate</td><td>LoginRequest, AuthResponse</td><td>Checks credentials, returns access token with expiry.</td></tr>
+        <tr><td><code>/api/conversations</code></td><td>List/create conversations</td><td>ConversationDto, CreateConversationRequest</td><td>Scoped to current user via claims.</td></tr>
+        <tr><td><code>/api/conversations/{id}</code></td><td>Get/delete conversation</td><td>ConversationDto</td><td>Ownership enforced in application layer.</td></tr>
+        <tr><td><code>/api/chat</code></td><td>Submit message to LLM</td><td>ChatRequest, ChatResponse</td><td>Supports streaming when backend exposes SSE-like partials.</td></tr>
+        <tr><td><code>/health/live</code>, <code>/health/ready</code></td><td>Probes</td><td>n/a</td><td>Used by probes and reverse proxies for routing decisions.</td></tr>
+        <tr><td><code>/metrics</code></td><td>Prometheus metrics</td><td>n/a</td><td>Enabled via config; exposes request duration and DB call counters.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Middleware & Cross-Cutting Concerns</h2>
+    <ul>
+      <li><strong>Error Handling:</strong> Central exception middleware returns consistent problem details and logs correlation IDs for troubleshooting.</li>
+      <li><strong>Authentication:</strong> JWT bearer tokens validated against configured issuer/audience; optional development bypass controlled via configuration.</li>
+      <li><strong>CORS:</strong> Defaults to localhost origins for WebApp; extend to additional hostnames for deployments.</li>
+      <li><strong>Forwarded Headers:</strong> Honors <code>X-Forwarded-For</code>/<code>X-Forwarded-Proto</code> when running behind Caddy/Nginx.</li>
+      <li><strong>Rate Limiting:</strong> Can plug in ASP.NET rate limiting middleware to protect <code>/api/chat</code> and authentication endpoints.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Observability</h2>
+    <ul>
+      <li><strong>Logging:</strong> Structured logging with request IDs, user IDs (when authenticated), and latency measurements.</li>
+      <li><strong>Metrics:</strong> Histograms for request durations, counters for 5xx responses, and LLM call latency when instrumentation is enabled in <code>Gateway.Infrastructure</code>.</li>
+      <li><strong>Tracing:</strong> Activity sources can be connected to OpenTelemetry exporters; annotate spans around chat/DB calls.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Integration Points</h2>
+    <ul>
+      <li><strong>Application Layer:</strong> All route handlers delegate to <code>Gateway.Application</code> commands/queries to centralize business rules.</li>
+      <li><strong>Infrastructure:</strong> Registers EF Core context and HTTP clients so handlers resolve them via DI; keeps controller logic thin.</li>
+      <li><strong>Frontend:</strong> WebApp consumes JSON contracts described above; maintain backward compatibility by versioning or using optional fields.</li>
+      <li><strong>Reverse Proxy:</strong> Works with <code>deploy/caddy</code> and <code>deploy/nginx</code> configs. Ensure <code>app.UseHttpsRedirection()</code> is conditioned when TLS termination occurs at the proxy.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extension Tips</h2>
+    <ul>
+      <li>Add new endpoints under <code>Endpoints/</code> using minimal APIs; keep request parsing close to the edge and push logic into application services.</li>
+      <li>Use endpoint filters for cross-cutting validation or feature flags.</li>
+      <li>Document DTO changes in <code>docs/runtime-flows.html</code> and update the WebApp API client accordingly.</li>
+      <li>Guard breaking changes with explicit versioning (<code>/api/v2</code>) if you need to reshape chat message formats.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

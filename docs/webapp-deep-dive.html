@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebApp Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>WebApp Deep Dive</h1>
+  <p>React/TypeScript frontend built with Vite and Tailwind. Consumes Gateway.Api for authentication, conversation lists, chat messaging, and streaming responses.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-api-deep-dive.html">Gateway.Api</a>
+    <a href="gateway-application-deep-dive.html">Gateway.Application</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>src/WebApp/
+├─ src/
+│  ├─ api/           # API client wrappers and fetch helpers
+│  ├─ components/    # Reusable UI components (chat bubbles, buttons, forms)
+│  ├─ features/      # Screens for auth, conversations, chat workspace
+│  ├─ hooks/         # Custom hooks for state and data fetching
+│  ├─ styles/        # Tailwind config and global styles
+│  └─ main.tsx       # Application entry wiring providers/routes
+├─ public/           # Static assets
+├─ vite.config.ts    # Vite configuration
+└─ package.json      # Scripts and dependencies
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Data & State Flow</h2>
+    <ul>
+      <li><strong>Authentication:</strong> Login/register forms call <code>/api/auth</code> endpoints, store tokens in memory/local storage, and attach Authorization headers on subsequent requests.</li>
+      <li><strong>Conversations:</strong> List view fetches <code>/api/conversations</code>; selecting a conversation loads messages and metadata.</li>
+      <li><strong>Chat:</strong> Submits user messages to <code>/api/chat</code>; when streaming is enabled, the UI appends partial tokens until completion.</li>
+      <li><strong>Global State:</strong> Hooks manage auth state and current conversation; leverage React Query or lightweight fetch wrappers for caching/retries.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>UI Composition</h2>
+    <ul>
+      <li><span class="pill">Shell</span> App layout with navigation, status indicators, and theme-aware backgrounds.</li>
+      <li><span class="pill">Chat Workspace</span> Message list, composer, model selector, and streaming indicator.</li>
+      <li><span class="pill">Auth Views</span> Forms with validation feedback and error surfaces mapped from API responses.</li>
+      <li><span class="pill">Components</span> Buttons, inputs, code blocks, and badges reused across screens.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Configuration</h2>
+    <ul>
+      <li><strong>Environment Variables:</strong> Vite uses <code>VITE_API_BASE_URL</code> (and optionally <code>VITE_WEBSOCKET_URL</code>) to point at Gateway.Api behind Caddy/Nginx.</li>
+      <li><strong>Feature Flags:</strong> Toggle streaming UI elements and model options based on configuration fetched from the API.</li>
+      <li><strong>Styling:</strong> Tailwind config defines theme colors consistent with documentation branding.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Testing Guidance</h2>
+    <ul>
+      <li>Use Vitest for component/unit coverage and Playwright for end-to-end chat flows.</li>
+      <li>Mock API clients to verify UI state transitions (loading, error, success) without hitting the backend.</li>
+      <li>Ensure streaming UI handles partial updates and completion events gracefully.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extension Tips</h2>
+    <ul>
+      <li>Add new pages under <code>features/</code> and compose them using components to keep styling consistent.</li>
+      <li>Centralize API calls in <code>api/</code> to avoid duplication and simplify error handling.</li>
+      <li>Use suspense-friendly data fetching patterns if adopting React Query to streamline loading states.</li>
+      <li>Keep accessibility in mind: label inputs, support keyboard navigation, and provide status text for streaming.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gateway.Domain Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Gateway.Domain Deep Dive</h1>
+  <p>Defines the business core: entities, value objects, policies, and ports that isolate infrastructure decisions. Everything else depends on this project but it depends on nothing.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-api-deep-dive.html">Gateway.Api</a>
+    <a href="gateway-application-deep-dive.html">Gateway.Application</a>
+    <a href="gateway-infrastructure-deep-dive.html">Infrastructure</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>src/Gateway.Domain/
+├─ Entities/           # User, Conversation, Message with invariants
+├─ ValueObjects/       # Strongly typed IDs, timestamps, model identifiers
+├─ Services/           # Domain services for policies (ownership, retention)
+├─ Interfaces/         # Repository ports, clock abstractions, LLM connectors
+└─ Exceptions/         # Domain-specific exception or error definitions
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Entity Responsibilities</h2>
+    <ul>
+      <li><strong>User:</strong> Holds identity, hashed credentials, and aggregates conversations. Enforces password rules via helper services.</li>
+      <li><strong>Conversation:</strong> Owns ordered messages, model selection, and metadata (title, timestamps). Provides helpers to add messages while preserving invariants.</li>
+      <li><strong>Message:</strong> Immutable content with author role (user/assistant/system), timestamps, and optional token counts.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Value Objects & Policies</h2>
+    <ul>
+      <li><strong>Identifiers:</strong> Wrap GUIDs or strings to avoid mixing types across layers.</li>
+      <li><strong>Timestamps:</strong> Represented with clock abstraction to support deterministic testing.</li>
+      <li><strong>Model Selection:</strong> Value object constrains available LLM models (e.g., <code>gpt-3.5-turbo</code>, <code>local</code>), enabling validation without infrastructure knowledge.</li>
+      <li><strong>Retention:</strong> Policies to trim message history or enforce maximum age/length before sending to connectors.</li>
+      <li><strong>Ownership:</strong> Helpers to assert that a given user ID controls a conversation before allowing mutation.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Ports (Interfaces)</h2>
+    <ul>
+      <li><strong>IUserRepository:</strong> Fetch users by ID or email, store password hashes, and persist new registrations.</li>
+      <li><strong>IConversationRepository:</strong> Retrieve conversations with messages, save new conversations, delete by owner, and update titles/models.</li>
+      <li><strong>IChatConnector:</strong> Abstracts LLM calls; accepts message collections and returns (or streams) assistant replies.</li>
+      <li><strong>IClock / IIdGenerator:</strong> Provide time/ID sources to keep entities pure and deterministic under test.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How Other Layers Use the Domain</h2>
+    <ul>
+      <li><span class="pill">Gateway.Application</span> orchestrates repositories and connectors through the ports above, never referencing infrastructure types directly.</li>
+      <li><span class="pill">Gateway.Api</span> consumes DTOs shaped by the application layer; it never manipulates entities.</li>
+      <li><span class="pill">Gateway.Infrastructure</span> implements the ports using EF Core and HTTP clients, keeping domain definitions untouched.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Testing Guidance</h2>
+    <ul>
+      <li>Create pure unit tests for entities and value objects without hitting databases.</li>
+      <li>Mock <code>IClock</code> and <code>IIdGenerator</code> to create deterministic timestamps/IDs in domain tests.</li>
+      <li>Use fixture builders for <code>Conversation</code> and <code>Message</code> to keep tests expressive while covering edge cases.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extension Tips</h2>
+    <ul>
+      <li>Introduce new domain concepts (e.g., <em>Attachment</em>, <em>Workspace</em>) by defining entities/value objects first, then exposing ports needed by application handlers.</li>
+      <li>Keep business rules inside the domain; avoid sprinkling invariants across handlers or controllers.</li>
+      <li>Prefer immutability and factory methods that validate inputs before constructing entities.</li>
+      <li>Document new policies in <code>docs/architecture-overview.html</code> so other contributors can reason about boundaries.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

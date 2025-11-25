@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gateway.Application Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Gateway.Application Deep Dive</h1>
+  <p>Home of use cases, validation, authorization, and DTO mapping. Coordinates domain rules with infrastructure ports and keeps API endpoints thin.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-api-deep-dive.html">Gateway.Api</a>
+    <a href="gateway-domain-deep-dive.html">Gateway.Domain</a>
+    <a href="gateway-infrastructure-deep-dive.html">Infrastructure</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>src/Gateway.Application/
+├─ DependencyInjection/   # Extension methods to wire services into DI
+├─ Auth/                  # Register/login handlers, password hashing, token issuing
+├─ Conversations/         # Use cases for listing, creating, retrieving, deleting conversations
+├─ Chat/                  # Chat submission pipelines, model selection, streaming handling
+├─ DTOs/                  # Transport objects for requests/responses
+├─ Validators/            # FluentValidation-style rules for inputs
+└─ Common/                # Interfaces, base handlers, time/ID abstractions shared by use cases
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Use Case Patterns</h2>
+    <ul>
+      <li><strong>Command/Query Segregation:</strong> Commands mutate state (create conversation, submit chat message); queries fetch projections (list conversations/history).</li>
+      <li><strong>Handler Shape:</strong> Each handler receives a request DTO, performs validation, invokes domain policies, and calls ports defined in <code>Gateway.Domain</code>.</li>
+      <li><strong>Return Values:</strong> Prefer typed results (DTOs) with error primitives rather than raw exceptions to keep API responses predictable.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Validation & Authorization</h2>
+    <ul>
+      <li><strong>Input Validation:</strong> Ensures required fields (email, password, message content) are present and within bounds (length limits, model allowlist).</li>
+      <li><strong>Ownership Enforcement:</strong> Conversation and message operations check that the authenticated user owns the resource before proceeding.</li>
+      <li><strong>Rate & Size Guards:</strong> Apply token count or message length ceilings before invoking LLM connectors to prevent expensive calls.</li>
+      <li><strong>Replay Protection:</strong> Use correlation IDs from <code>Gateway.Api</code> to avoid duplicate processing when clients retry.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Mapping Responsibilities</h2>
+    <ul>
+      <li><strong>Domain-to-DTO:</strong> Converts entities like <code>Conversation</code> and <code>Message</code> into response DTOs tailored for WebApp consumption.</li>
+      <li><strong>DTO-to-Domain:</strong> Builds domain objects or value objects from incoming requests, delegating invariant enforcement to <code>Gateway.Domain</code>.</li>
+      <li><strong>Streaming Responses:</strong> When LLM clients stream partial completions, the application layer stitches and forwards them in the shape expected by API/websocket emitters.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Key Integration Points</h2>
+    <ul>
+      <li><strong>Domain Ports:</strong> Uses repository interfaces, clock abstractions, and LLM connector interfaces exposed by <code>Gateway.Domain</code>.</li>
+      <li><strong>Infrastructure:</strong> Resolves concrete EF Core repositories and HTTP clients through DI; handlers remain infrastructure-agnostic.</li>
+      <li><strong>WebApp Contracts:</strong> Maintains stable response shapes for the React frontend (IDs, timestamps, author/model metadata, streaming markers).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Common Flows</h2>
+    <ol>
+      <li><strong>Login:</strong> Validate credentials → fetch user via repository → verify password hash → emit JWT with claims for user ID → return <code>AuthResponse</code>.</li>
+      <li><strong>Create Conversation:</strong> Validate title/model → instantiate domain entity → persist via repository → return DTO with owner metadata.</li>
+      <li><strong>Chat Message:</strong> Check conversation ownership → record user message → invoke LLM connector → append assistant message → return chat transcript/stream.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Extension Tips</h2>
+    <ul>
+      <li>Add new use cases as standalone handlers in feature folders; keep side effects contained and orchestrate infrastructure via ports.</li>
+      <li>When introducing new response fields, mark them optional and version DTOs to avoid breaking the WebApp.</li>
+      <li>Encapsulate cross-cutting validation (e.g., rate limits, role checks) in reusable components invoked by handlers.</li>
+      <li>Keep long-running work (LLM calls, file uploads) cancellable by honoring <code>CancellationToken</code> propagated from API endpoints.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
