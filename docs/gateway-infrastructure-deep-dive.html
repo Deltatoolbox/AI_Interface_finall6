@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gateway.Infrastructure Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Gateway.Infrastructure Deep Dive</h1>
+  <p>Implements database access, external LLM connectors, and configuration binding while honoring <code>Gateway.Domain</code> ports. Keeps the domain pure and the application layer portable.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-api-deep-dive.html">Gateway.Api</a>
+    <a href="gateway-application-deep-dive.html">Gateway.Application</a>
+    <a href="gateway-domain-deep-dive.html">Gateway.Domain</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>src/Gateway.Infrastructure/
+├─ Persistence/
+│  ├─ GatewayDbContext.cs   # EF Core context, DbSets for Users, Conversations, Messages
+│  ├─ Configurations/       # Entity type configurations, constraints, indexes
+│  └─ Migrations/           # EF Core migrations for schema evolution
+├─ Repositories/            # Implementations of domain repository interfaces
+├─ HttpClients/             # OpenAI-compatible client wrappers for LLM calls
+├─ Options/                 # Strongly typed configuration classes (DB, OpenAI endpoints)
+└─ DependencyInjection/     # Wiring helpers for DbContext, clients, and telemetry
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Persistence</h2>
+    <ul>
+      <li><strong>DbContext:</strong> Configures SQLite by default; connection string provided via configuration or environment variables. Enables lazy-loading proxies only if required.</li>
+      <li><strong>Migrations:</strong> Generated using <code>dotnet ef migrations add</code> with <code>Gateway.Api</code> as the startup project. Apply migrations at startup in <code>SimpleGateway</code> and optionally in <code>Gateway.Api</code>.</li>
+      <li><strong>Repositories:</strong> Implement <code>IUserRepository</code> and <code>IConversationRepository</code> with async methods, transaction boundaries, and eager-loading of messages when needed.</li>
+      <li><strong>Indexes & Constraints:</strong> Configurations enforce unique email addresses, cascade deletes for messages, and length constraints on content/title fields.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>External LLM Connectors</h2>
+    <ul>
+      <li><strong>OpenAI-Compatible Client:</strong> Wraps <code>HttpClient</code> to call LM Studio or OpenAI endpoints with the <code>/v1/chat/completions</code> contract.</li>
+      <li><strong>Streaming Support:</strong> Handles server-sent token streams when <code>stream=true</code>; forwards partials back to <code>Gateway.Application</code>.</li>
+      <li><strong>Model Configuration:</strong> Reads default and allowed models from configuration to enforce model allowlists in the application layer.</li>
+      <li><strong>Resilience:</strong> Retries transient HTTP failures and maps network errors into domain-friendly error results.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Configuration Binding</h2>
+    <ul>
+      <li><strong>Database:</strong> Connection string and migration assembly name bound into options consumed by DbContext registration.</li>
+      <li><strong>LLM:</strong> API keys, base URLs, default model, temperature/top-p, and timeout settings bound into the OpenAI client options.</li>
+      <li><strong>Feature Flags:</strong> Toggle streaming, metrics, and request logging without code changes.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Observability & Operations</h2>
+    <ul>
+      <li><strong>Metrics:</strong> Collects DB query duration histograms and LLM call counters for exposure via <code>/metrics</code> in <code>Gateway.Api</code>.</li>
+      <li><strong>Logging:</strong> Structured logs around repository calls and HTTP requests; includes correlation IDs propagated from the API layer.</li>
+      <li><strong>Seeding:</strong> Optional seed routines to create demo users or sample conversations when running locally.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extension Tips</h2>
+    <ul>
+      <li>Add new external systems by defining a port in <code>Gateway.Domain</code>, implementing it here, and registering via <code>DependencyInjection</code> helpers.</li>
+      <li>When changing schemas, create migrations, update scripts, and document in <code>docs/operations-and-development.html</code>.</li>
+      <li>Keep repository methods narrowly scoped; avoid leaking IQueryable upstream to preserve boundaries.</li>
+      <li>Use <code>CancellationToken</code> in all async operations to respect request cancellations.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

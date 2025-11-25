@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway Suite – Architecture Overview</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.7; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    ul { margin-top: 0; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+    th { background: #f1f5f9; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
+    .small { font-size: 0.94em; color: #475569; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Architecture Overview</h1>
+  <p>End-to-end description of the AI Gateway Suite topology, deployment modes, and cross-cutting concerns. This page complements the hub (<a style="color:white; text-decoration: underline;" href="full-documentation.html">Documentation Hub</a>) and links to deeper module details.</p>
+  <nav>
+    <a href="#shapes">Deployment Shapes</a>
+    <a href="#stack">Tech Stack</a>
+    <a href="#data">Data & Integrations</a>
+    <a href="#proxy">Reverse Proxy</a>
+    <a href="#cross-cutting">Cross-Cutting</a>
+    <a href="#domains">Domain Boundaries</a>
+    <a href="#flows">End-to-End Flows</a>
+    <a href="#scalability">Scalability</a>
+    <a href="#security">Security</a>
+    <a href="#ops">Operations</a>
+    <a href="#appendix">Appendix</a>
+  </nav>
+</header>
+<main>
+  <section id="shapes">
+    <h2>Deployment Shapes</h2>
+    <h3>Layered Stack</h3>
+    <ul>
+      <li><strong>Gateway.Api</strong> exposes minimal APIs, health endpoints, and metrics.</li>
+      <li><strong>Gateway.Application</strong> orchestrates use cases for auth, chat, conversations, and admin flows.</li>
+      <li><strong>Gateway.Domain</strong> provides entities, invariants, and service/repository ports.</li>
+      <li><strong>Gateway.Infrastructure</strong> delivers EF Core persistence, LLM adapters, and outbound integrations.</li>
+      <li><strong>WebApp</strong> renders the React UI and communicates with the API.</li>
+    </ul>
+    <h3>SimpleGateway Monolith</h3>
+    <ul>
+      <li>Single ASP.NET Core project combining API surface, EF Core migrations, and admin tools.</li>
+      <li>SQLite by default; migrations live next to the executable for quick bootstrapping.</li>
+      <li>Ships with helper scripts (<code>start-simple.sh</code>, <code>stop-simple.sh</code>, <code>status-simple.sh</code>) and proxy-ready configuration.</li>
+    </ul>
+    <h3>Decision Matrix</h3>
+    <div class="grid">
+      <div class="card">
+        <h4>Local demos</h4>
+        <p class="small">Use <code>SimpleGateway</code> with the bundled SQLite database and LM Studio endpoint. Minimal configuration, great for validation and QA.</p>
+      </div>
+      <div class="card">
+        <h4>Team deployments</h4>
+        <p class="small">Adopt the layered stack: deploy <code>Gateway.Api</code> + <code>WebApp</code> behind the proxy while sharing a managed SQLite or Postgres instance.</p>
+      </div>
+      <div class="card">
+        <h4>Scale-out clusters</h4>
+        <p class="small">Run multiple API replicas with sticky sessions on the proxy, externalize persistence, and separate job/worker roles for slow I/O (webhooks, ingestion).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="stack">
+    <h2>Tech Stack and Layer Responsibilities</h2>
+    <table>
+      <tr><th>Layer</th><th>Key Tech</th><th>Primary Responsibilities</th></tr>
+      <tr><td>WebApp</td><td>React, TypeScript, Vite, Tailwind</td><td>UI/UX, chat rendering, auth flows, API composition</td></tr>
+      <tr><td>Gateway.Api</td><td>ASP.NET Core 8 Minimal APIs</td><td>Routing, DI composition, auth middleware, health/metrics, CORS</td></tr>
+      <tr><td>Gateway.Application</td><td>.NET, FluentValidation, MediatR-style orchestration</td><td>Use-case coordination, DTO mapping, validation, authorization</td></tr>
+      <tr><td>Gateway.Domain</td><td>.NET</td><td>Entities, value objects, invariants, interfaces for persistence and services</td></tr>
+      <tr><td>Gateway.Infrastructure</td><td>EF Core, SQLite, HttpClient</td><td>Persistence implementations, migrations, LLM/OpenAI-compatible clients</td></tr>
+      <tr><td>SimpleGateway</td><td>ASP.NET Core 8, EF Core, SQLite</td><td>Self-contained deployment with combined API + data + admin flows</td></tr>
+    </table>
+    <h3>Key Composition Points</h3>
+    <ul>
+      <li><strong>Dependency Injection:</strong> the API registers validators, handlers, repositories, and HTTP clients using the built-in <code>IServiceCollection</code>.</li>
+      <li><strong>Configuration Binding:</strong> typed options mirror <code>appsettings.json</code>; environment variables override defaults for containerized runs.</li>
+      <li><strong>Pipeline Middleware:</strong> authentication, authorization, CORS, exception handling, and metrics middleware wrap minimal API endpoints for consistency.</li>
+    </ul>
+    <h3>Data Contracts</h3>
+    <p>DTOs in <code>Gateway.Application</code> describe inbound/outbound payloads. They map to domain entities through simple translators to avoid leaking persistence concerns into the API surface.</p>
+    <h3>Front-end Integration</h3>
+    <ul>
+      <li>Type-safe clients are generated via <code>fetch</code> wrappers that call <code>/api</code> routes.</li>
+      <li>State management favors React Query for caching chat history and conversation metadata.</li>
+      <li>Design tokens align with Tailwind utility classes and mirror the API resource names for discoverability.</li>
+    </ul>
+  </section>
+
+  <section id="data">
+    <h2>Data & External Integrations</h2>
+    <ul>
+      <li><strong>Persistence:</strong> SQLite is the default database; EF Core migrations are maintained in <code>Gateway.Infrastructure</code> and <code>SimpleGateway</code>.</li>
+      <li><strong>LLM Backend:</strong> LM Studio is the default OpenAI-compatible endpoint (<code>http://127.0.0.1:1234</code>), configured through appsettings or environment variables.</li>
+      <li><strong>Configuration:</strong> Environment-aware <code>appsettings*.json</code> files control connection strings, JWT keys, and external service URLs.</li>
+    </ul>
+    <h3>Connection Lifecycles</h3>
+    <ul>
+      <li>DbContext instances are scoped per request to avoid transaction bleed and encourage retryable patterns.</li>
+      <li>Typed <code>HttpClient</code> instances handle outbound calls to LLM backends with circuit breakers and timeouts.</li>
+      <li>Background tasks (e.g., webhooks or async exports) reuse the same configuration pipeline but may run under dedicated service accounts.</li>
+    </ul>
+    <h3>Schema Highlights</h3>
+    <ul>
+      <li><strong>Users:</strong> stores identity provider subject, roles, and profile metadata.</li>
+      <li><strong>Conversations:</strong> relates users to chat threads and aggregates message references.</li>
+      <li><strong>Messages:</strong> captures user and assistant turns, token counts, and streaming state.</li>
+      <li><strong>Providers:</strong> optional table for external LLM endpoints, including API keys and model catalogs.</li>
+    </ul>
+    <h3>Migration Strategy</h3>
+    <p>EF Core migrations live near the infrastructure layer. For <code>SimpleGateway</code>, migrations sit alongside the executable for easy <code>dotnet ef database update</code> runs. For the layered stack, migrations live in <code>Gateway.Infrastructure</code> and are executed at startup behind an admin flag or via CLI.</p>
+  </section>
+
+  <section id="proxy">
+    <h2>Reverse Proxy Integration</h2>
+    <p>Two proxy options ship with the repository:</p>
+    <ul>
+      <li><strong>Caddy</strong> (default): <code>Caddyfile</code> and <code>deploy/caddy/Caddyfile</code> configure TLS, static assets, and API forwarding (<code>/api</code>).</li>
+      <li><strong>Nginx</strong>: <code>deploy/nginx/nginx.conf</code> offers an alternative for environments where Nginx is standard.</li>
+    </ul>
+    <p>In both cases, static assets from the WebApp build are served directly, while API traffic is proxied to the Kestrel backend (SimpleGateway or Gateway.Api, depending on the chosen shape).</p>
+    <h3>Proxy Responsibilities</h3>
+    <ul>
+      <li>TLS termination with automatic certificate renewal (Caddy) or manual <code>certbot</code> hooks (Nginx).</li>
+      <li>Compression and caching for static assets to reduce cold-start load time for the WebApp.</li>
+      <li>Rate limiting and IP allowlists when running in shared environments.</li>
+      <li>WebSocket upgrade handling for streaming chat responses.</li>
+    </ul>
+    <h3>Path Conventions</h3>
+    <table>
+      <tr><th>Path</th><th>Description</th></tr>
+      <tr><td><code>/</code></td><td>Serves the WebApp build output.</td></tr>
+      <tr><td><code>/api/*</code></td><td>Proxies to the ASP.NET Core backend (SimpleGateway or Gateway.Api).</td></tr>
+      <tr><td><code>/health/*</code></td><td>Health and readiness probes used by orchestrators.</td></tr>
+      <tr><td><code>/metrics</code></td><td>Optional Prometheus scrape endpoint.</td></tr>
+    </table>
+  </section>
+
+  <section id="cross-cutting">
+    <h2>Cross-Cutting Concerns</h2>
+    <ul>
+      <li><strong>Observability:</strong> Health endpoints at <code>/health/live</code> and <code>/health/ready</code>; Prometheus metrics exposed at <code>/metrics</code> when enabled.</li>
+      <li><strong>Security:</strong> JWT-based authentication/authorization, CORS defaults aligned with the dev frontend, and TLS termination delegated to the proxy.</li>
+      <li><strong>Configuration Management:</strong> Environment variables override JSON settings; scripts in <code>deploy/</code> provide production-ready templates.</li>
+      <li><strong>Dev/Prod Parity:</strong> The same code paths are used for both shapes, with SimpleGateway bundling infrastructure pieces to simplify local-first deployments.</li>
+    </ul>
+    <h3>Resilience Patterns</h3>
+    <ul>
+      <li>Retry policies around LLM calls use exponential backoff to shield chat flows from intermittent upstream failures.</li>
+      <li>Circuit breakers prevent thundering herds when providers are unhealthy.</li>
+      <li>Idempotent message writes protect against duplicate submissions during transient network issues.</li>
+    </ul>
+    <h3>Performance Considerations</h3>
+    <ul>
+      <li>Streaming responses keep latency low for chat UX; buffering is minimized to the first tokens.</li>
+      <li>Database indices target user/conversation/message lookups to support live chat retrieval.</li>
+      <li>Chunked pagination and lazy loading keep admin tables responsive.</li>
+    </ul>
+  </section>
+
+  <section id="domains">
+    <h2>Domain Boundaries and Modules</h2>
+    <h3>User & Identity Domain</h3>
+    <ul>
+      <li>Supports email/password or external IdP subject identifiers.</li>
+      <li>Roles encode admin privileges for migrations, configuration editing, and audit views.</li>
+      <li>Claims are embedded in JWTs and verified on each request via middleware.</li>
+    </ul>
+    <h3>Conversation Domain</h3>
+    <ul>
+      <li>Conversations aggregate many messages and track the active model/provider configuration.</li>
+      <li>Messages carry role (user/assistant/system), token counts, streaming state, and timestamps.</li>
+      <li>Domain services handle safety checks such as maximum token windows or restricted models.</li>
+    </ul>
+    <h3>Provider Domain</h3>
+    <ul>
+      <li>Encapsulates external LLM endpoints, credentials, and routing hints.</li>
+      <li>Abstracted via interfaces so that LM Studio, Azure OpenAI, or other providers can be swapped without changing application code.</li>
+      <li>Supports per-provider rate limits and model catalogs.</li>
+    </ul>
+    <h3>Configuration Domain</h3>
+    <ul>
+      <li>Controls gateway-level settings such as max concurrent streams, retention policies, and feature flags.</li>
+      <li>Persists both static defaults and runtime overrides with optimistic concurrency tokens.</li>
+    </ul>
+    <h3>Notification Domain</h3>
+    <ul>
+      <li>Future-facing: optional module for webhooks and email alerts when conversations complete or errors occur.</li>
+      <li>Designed to run behind background processors to avoid slowing synchronous chat flows.</li>
+    </ul>
+  </section>
+
+  <section id="flows">
+    <h2>End-to-End Runtime Flows</h2>
+    <h3>Authentication Flow</h3>
+    <ol>
+      <li>User submits credentials to <code>/api/auth/login</code>.</li>
+      <li>Application layer validates payload and fetches the user via repository.</li>
+      <li>On success, JWT is issued with user id, roles, and expiry; response sets secure cookie for the WebApp.</li>
+      <li>Subsequent requests attach the token; middleware validates signature and populates <code>HttpContext.User</code>.</li>
+    </ol>
+    <h3>Chat Flow</h3>
+    <ol>
+      <li>WebApp posts a message to <code>/api/chat</code> with conversation id and model parameters.</li>
+      <li>Application layer loads conversation, validates access, and enforces quota limits.</li>
+      <li>Domain service constructs the prompt window and calls provider adapter; streaming begins immediately.</li>
+      <li>Tokens are forwarded to the client via Server-Sent Events or chunked HTTP responses.</li>
+      <li>Upon completion, message is persisted with token counts and provider metadata.</li>
+    </ol>
+    <h3>Conversation Management</h3>
+    <ol>
+      <li>Create conversation: <code>/api/conversations</code> inserts a new root entity and optional initial system message.</li>
+      <li>List conversations: paginated query filters by user and status.</li>
+      <li>Delete conversation: soft deletes mark rows with timestamps to preserve history without exposing data.</li>
+    </ol>
+    <h3>Administration</h3>
+    <ol>
+      <li>Admin user authenticates and hits <code>/api/admin/config</code>.</li>
+      <li>Reads or updates feature flags, provider credentials, or rate limits.</li>
+      <li>Migrations can be triggered via CLI or startup flag if the role check passes.</li>
+    </ol>
+    <h3>Resilience during Failures</h3>
+    <ol>
+      <li>Retry budgets wrap provider calls; if exceeded, the message is marked failed with actionable error codes.</li>
+      <li>Health probes signal orchestrators to recycle instances when downstream dependencies are degraded.</li>
+      <li>Audit events record administrator actions and critical errors for later review.</li>
+    </ol>
+  </section>
+
+  <section id="scalability">
+    <h2>Scalability & Deployment Guidance</h2>
+    <h3>Horizontal Scaling</h3>
+    <ul>
+      <li>API replicas are stateless; session affinity is only required for long-lived streams if the proxy cannot share the same backend pool.</li>
+      <li>Database must be externalized (e.g., managed SQLite over network FS or Postgres) for concurrent writes.</li>
+      <li>LLM provider calls scale horizontally since each instance maintains its own outbound connections.</li>
+    </ul>
+    <h3>Vertical Scaling</h3>
+    <ul>
+      <li>CPU and memory sizing follow the number of concurrent chat streams; streaming consumes bounded memory while the LLM backend determines CPU/GPU usage.</li>
+      <li>Set Kestrel thread pool and HTTP limits conservatively when running alongside GPU-heavy workloads.</li>
+    </ul>
+    <h3>Performance Tuning Checklist</h3>
+    <ul>
+      <li>Enable HTTP/2 on the proxy for efficient multiplexing of chat streams.</li>
+      <li>Use persistent database connections and prepared statements via EF Core.</li>
+      <li>Cache static assets aggressively with immutable fingerprints from the WebApp build.</li>
+      <li>Reduce prompt size with system-level compression rules or summarization for long histories.</li>
+    </ul>
+    <h3>Reference Deployments</h3>
+    <div class="grid">
+      <div class="card">
+        <h4>Single Node</h4>
+        <p class="small">Caddy + SimpleGateway + SQLite. Ideal for offline or air-gapped demos with LM Studio on the same host.</p>
+      </div>
+      <div class="card">
+        <h4>Edge Site</h4>
+        <p class="small">Caddy terminates TLS; Gateway.Api runs behind it with WebApp static assets on disk; SQLite lives on a persistent volume.</p>
+      </div>
+      <div class="card">
+        <h4>Cloud</h4>
+        <p class="small">Load balancer -> Nginx -> Gateway.Api replicas; WebApp hosted on object storage with CDN; Postgres for persistence; external LLM provider (e.g., Azure OpenAI).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="security">
+    <h2>Security Model</h2>
+    <h3>Authentication</h3>
+    <ul>
+      <li>JWT tokens carry user id, roles, and expiry; signed with symmetric keys defined in <code>appsettings.json</code> or environment variables.</li>
+      <li>Refresh token flow can be added by storing long-lived tokens server-side and minting short-lived access tokens.</li>
+    </ul>
+    <h3>Authorization</h3>
+    <ul>
+      <li>Policies guard admin endpoints; role claims are enforced in minimal API filters.</li>
+      <li>Conversation resources enforce ownership checks to prevent cross-tenant leakage.</li>
+    </ul>
+    <h3>Transport Security</h3>
+    <ul>
+      <li>TLS termination handled by the proxy; backend communicates over HTTP on the private network.</li>
+      <li>Strict CORS allows only configured origins; WebSockets inherit the same policy.</li>
+    </ul>
+    <h3>Secrets Management</h3>
+    <ul>
+      <li>Prefer environment variables or secret stores to inject provider keys; avoid committing secrets into <code>appsettings</code>.</li>
+      <li>Local development uses placeholder keys; production expects rotated secrets and restricted IAM scopes.</li>
+    </ul>
+    <h3>Data Protection</h3>
+    <ul>
+      <li>Database access is parameterized via EF Core, minimizing injection vectors.</li>
+      <li>Optional encryption-at-rest can be layered with disk or database-level tooling.</li>
+      <li>Audit logs capture administrative actions and authentication failures.</li>
+    </ul>
+  </section>
+
+  <section id="ops">
+    <h2>Operations & Maintainability</h2>
+    <h3>Configuration Surface</h3>
+    <ul>
+      <li>Environment variables mirror <code>appsettings</code> keys: <code>ConnectionStrings__Default</code>, <code>Jwt__Issuer</code>, <code>Jwt__Key</code>, <code>Provider__BaseUrl</code>, etc.</li>
+      <li>CLI flags can override select settings for ephemeral runs (e.g., <code>--urls</code>, <code>--seed-admin</code>).</li>
+      <li>Configuration is logged at startup with sensitive values redacted.</li>
+    </ul>
+    <h3>Observability Toolkit</h3>
+    <ul>
+      <li>Health endpoints integrate with Docker/Kubernetes probes.</li>
+      <li>Prometheus metrics (when enabled) include request durations, stream counts, and provider latency histograms.</li>
+      <li>Structured logging (JSON-friendly) supports ingestion into ELK/OpenSearch stacks.</li>
+    </ul>
+    <h3>Backup and Restore</h3>
+    <ul>
+      <li>SQLite files can be snapshot; for Postgres, schedule logical backups with PITR.</li>
+      <li>LLM provider keys should be stored in dedicated secret managers for easy rotation.</li>
+      <li>WebApp assets are deterministic builds and can be redeployed from CI artifacts.</li>
+    </ul>
+    <h3>Upgrade Path</h3>
+    <ol>
+      <li>Update code and run tests locally.</li>
+      <li>Apply EF Core migrations in staging; verify schema diffs.</li>
+      <li>Roll out API changes behind feature flags when possible.</li>
+      <li>Redeploy WebApp assets last to ensure compatibility with newly exposed APIs.</li>
+    </ol>
+    <h3>Failure Drills</h3>
+    <ul>
+      <li>Simulate provider outages and verify circuit breakers and fallbacks.</li>
+      <li>Exercise database lock contention with concurrent chat loads.</li>
+      <li>Validate that health endpoints reflect dependency failures for automated remediation.</li>
+    </ul>
+  </section>
+
+  <section id="appendix">
+    <h2>Appendix: Code Maps and File Pointers</h2>
+    <h3>Backend</h3>
+    <ul>
+      <li><code>src/Gateway.Api/Program.cs</code> – minimal API endpoints, DI setup, middleware registration.</li>
+      <li><code>src/Gateway.Application</code> – validators, handlers, DTOs, orchestration logic.</li>
+      <li><code>src/Gateway.Domain</code> – entities, value objects, repository and provider interfaces.</li>
+      <li><code>src/Gateway.Infrastructure</code> – EF Core DbContext, migrations, provider implementations, HTTP client adapters.</li>
+      <li><code>src/SimpleGateway</code> – monolithic variant bundling API + infrastructure + migrations.</li>
+    </ul>
+    <h3>Frontend</h3>
+    <ul>
+      <li><code>src/WebApp</code> – React application entry point, routes, and shared components.</li>
+      <li><code>src/WebApp/src/api</code> – lightweight API client wrappers aligning with backend routes.</li>
+      <li><code>src/WebApp/src/features</code> – conversation UI, chat panes, settings panels, and authentication pages.</li>
+      <li><code>src/WebApp/src/styles</code> – Tailwind configuration and theme tokens.</li>
+    </ul>
+    <h3>Deployment Artifacts</h3>
+    <ul>
+      <li><code>deploy/caddy/Caddyfile</code> – reference proxy configuration with TLS and static asset hosting.</li>
+      <li><code>deploy/nginx/nginx.conf</code> – Nginx alternative with similar routing.</li>
+      <li><code>start.sh</code>, <code>stop.sh</code>, <code>status.sh</code> – helper scripts for the layered stack.</li>
+      <li><code>start-simple.sh</code>, <code>stop-simple.sh</code>, <code>status-simple.sh</code> – helper scripts for the monolith.</li>
+    </ul>
+    <h3>Design Tenets</h3>
+    <ul>
+      <li><strong>Composition over coupling:</strong> Dependency injection and clear interfaces make provider swaps straightforward.</li>
+      <li><strong>Secure defaults:</strong> CORS, JWT, and TLS guardrails are enabled early; administrative actions are role-gated.</li>
+      <li><strong>Observability first:</strong> Health checks and metrics are baked into the API surface to simplify operations.</li>
+      <li><strong>Local-first:</strong> SimpleGateway and LM Studio defaults allow developers to test the full stack without cloud dependencies.</li>
+    </ul>
+    <h3>Glossary</h3>
+    <ul>
+      <li><span class="pill">Gateway</span> – the API layer exposing chat and admin endpoints.</li>
+      <li><span class="pill">Conversation</span> – a thread that groups user and assistant messages.</li>
+      <li><span class="pill">Provider</span> – an external LLM endpoint implementing the OpenAI-compatible API surface.</li>
+      <li><span class="pill">WebApp</span> – the React front end consumed by end users and administrators.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

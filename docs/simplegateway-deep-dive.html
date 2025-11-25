@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimpleGateway Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1100px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>SimpleGateway Deep Dive</h1>
+  <p>All-in-one executable that bundles API endpoints, migrations, and admin utilities for a local-first deployment. Uses the same domain/application logic with simplified hosting.</p>
+  <nav>
+    <a href="module-deep-dive.html">Module Index</a>
+    <a href="gateway-api-deep-dive.html">Gateway.Api</a>
+    <a href="gateway-application-deep-dive.html">Gateway.Application</a>
+  </nav>
+</header>
+<main>
+  <section>
+    <h2>Project Layout</h2>
+    <pre><code>src/SimpleGateway/
+├─ Program.cs           # Composition root and endpoint definitions
+├─ appsettings*.json    # SQLite connection string, feature toggles
+├─ Migrations/          # EF Core migrations co-located with the executable
+└─ Modules/             # API endpoints and services specific to the monolith
+</code></pre>
+  </section>
+
+  <section>
+    <h2>Hosting Model</h2>
+    <ul>
+      <li><strong>Self-contained:</strong> Ships API + migrations in one process; ideal for local or single-node installs.</li>
+      <li><strong>Database:</strong> Defaults to SQLite stored alongside the binary; connection string can target a network path for shared usage.</li>
+      <li><strong>Proxy:</strong> Works with <code>start-simple.sh</code> plus <code>Caddyfile.simple</code> to expose HTTP(S) on localhost.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Feature Parity</h2>
+    <ul>
+      <li>Implements the same conversation and chat flows as <code>Gateway.Api</code> by referencing the same application/domain assemblies.</li>
+      <li>Supports health and readiness endpoints for lightweight monitoring.</li>
+      <li>Includes migrations adjacent to the project so <code>dotnet ef database update</code> runs without cross-project references.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Operations Guidance</h2>
+    <ul>
+      <li><strong>Setup:</strong> Run <code>./setup-local.sh</code> then <code>./start-simple.sh</code> to launch with defaults.</li>
+      <li><strong>Backups:</strong> Copy the SQLite file before upgrades; prune old migrations only after backups are verified.</li>
+      <li><strong>Configuration:</strong> Override settings via environment variables (e.g., <code>ConnectionStrings__Default</code>, <code>OpenAI__ApiKey</code>).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Extension Tips</h2>
+    <ul>
+      <li>Add admin or maintenance endpoints directly in this project when they do not belong to the layered stack.</li>
+      <li>For features shared with the layered stack, implement in <code>Gateway.Application</code>/<code>Gateway.Domain</code> and reuse here to avoid drift.</li>
+      <li>Monitor bundle size and keep dependencies minimal so the single binary stays lightweight.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

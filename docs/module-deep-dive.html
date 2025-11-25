@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway Suite – Module Deep Dive</title>
+  <style>
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.65; margin: 0; padding: 0; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(120deg, #0ea5e9, #6366f1); color: white; padding: 28px 44px; }
+    main { padding: 32px 44px 64px; max-width: 1200px; margin: 0 auto; }
+    h1, h2, h3, h4 { color: #0f172a; }
+    section { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.95em; }
+    ul { margin-top: 0; }
+    nav a { color: #e0f2fe; margin-right: 10px; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.4); border-radius: 6px; }
+    nav a:hover { background: rgba(255,255,255,0.15); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; background: #e0f2fe; color: #0ea5e9; font-weight: 600; font-size: 0.85em; }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; box-shadow: 0 8px 20px rgba(15,23,42,0.04); }
+    .card h3 { margin-top: 0; }
+    .card a { color: #0ea5e9; text-decoration: none; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Module Deep Dive</h1>
+  <p>How each backend and frontend module is structured internally, which responsibilities it carries, and how the modules collaborate. This page links to dedicated drill-downs for every module so you can explore responsibilities, data shapes, and integration points in detail.</p>
+  <nav>
+    <a href="full-documentation.html">Documentation Hub</a>
+    <a href="#cards">Module Pages</a>
+    <a href="#maps">Quick Maps</a>
+  </nav>
+</header>
+<main>
+  <section id="cards">
+    <h2>Linked Module Guides</h2>
+    <p>Each card opens a focused HTML guide for the corresponding module. Use these to understand composition roots, key classes, data contracts, and extension seams without hunting through the source tree.</p>
+    <div class="card-grid">
+      <div class="card">
+        <h3><a href="gateway-api-deep-dive.html">Gateway.Api</a></h3>
+        <p>HTTP edge, minimal APIs, middleware, DI setup, observability, and request/response contracts.</p>
+      </div>
+      <div class="card">
+        <h3><a href="gateway-application-deep-dive.html">Gateway.Application</a></h3>
+        <p>Use cases, validation pipeline, authorization checks, DTO mapping, and orchestration logic.</p>
+      </div>
+      <div class="card">
+        <h3><a href="gateway-domain-deep-dive.html">Gateway.Domain</a></h3>
+        <p>Entities, value objects, policies, domain services, and the ports that shape infrastructure adapters.</p>
+      </div>
+      <div class="card">
+        <h3><a href="gateway-infrastructure-deep-dive.html">Gateway.Infrastructure</a></h3>
+        <p>EF Core context, repositories, migrations, external LLM clients, and configuration binding.</p>
+      </div>
+      <div class="card">
+        <h3><a href="simplegateway-deep-dive.html">SimpleGateway</a></h3>
+        <p>Monolithic alternative with built-in migrations, SQLite wiring, and operational toggles.</p>
+      </div>
+      <div class="card">
+        <h3><a href="webapp-deep-dive.html">WebApp</a></h3>
+        <p>React/Vite frontend composition, state/data flows, UI patterns, and API integration practices.</p>
+      </div>
+      <div class="card">
+        <h3><a href="testing-modules-deep-dive.html">Testing Modules</a></h3>
+        <p>Unit and integration test projects, fixtures, harnesses, and guidance for expanding coverage.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="maps">
+    <h2>Quick Responsibility Maps</h2>
+    <p>Use this compact reference to recall the primary responsibilities of each module before jumping into the detailed guides.</p>
+
+    <section id="api">
+      <h3>Gateway.Api</h3>
+      <ul>
+        <li><span class="pill">Edge</span> Minimal APIs define routes for authentication, conversations, chat completion, health (<code>/health/live</code>, <code>/health/ready</code>), and metrics.</li>
+        <li><span class="pill">Pipelines</span> Middleware covers JWT validation, error handling, request logging, and correlation IDs.</li>
+        <li><span class="pill">Composition</span> Configures DI, CORS, JSON options, rate limiting, and endpoints exposed to the reverse proxy.</li>
+      </ul>
+    </section>
+
+    <section id="application">
+      <h3>Gateway.Application</h3>
+      <ul>
+        <li><span class="pill">Use Cases</span> Implements commands/queries for auth, conversation lifecycle, and message submission.</li>
+        <li><span class="pill">Validation</span> Guards incoming DTOs, applies limits, and enforces ownership/authorization.</li>
+        <li><span class="pill">Mapping</span> Shapes domain objects into transport-friendly responses for WebApp.</li>
+      </ul>
+    </section>
+
+    <section id="domain">
+      <h3>Gateway.Domain</h3>
+      <ul>
+        <li><span class="pill">Entities</span> Core models (<em>User</em>, <em>Conversation</em>, <em>Message</em>) encode invariants and lifecycle rules.</li>
+        <li><span class="pill">Ports</span> Interfaces define contracts for repositories, clocks, and LLM connectors.</li>
+        <li><span class="pill">Policies</span> Shared domain rules for ownership, retention, and content safety.</li>
+      </ul>
+    </section>
+
+    <section id="infrastructure">
+      <h3>Gateway.Infrastructure</h3>
+      <ul>
+        <li><span class="pill">Persistence</span> EF Core DbContext, migrations, and repository implementations over SQLite.</li>
+        <li><span class="pill">Adapters</span> HTTP clients for OpenAI-compatible endpoints (e.g., LM Studio) and configuration binding.</li>
+        <li><span class="pill">Integration</span> Transaction boundaries, retries, and telemetry instrumentation.</li>
+      </ul>
+    </section>
+
+    <section id="simplegateway">
+      <h3>SimpleGateway</h3>
+      <ul>
+        <li><span class="pill">Self-Contained</span> Bundles API endpoints, migrations, and admin utilities into one executable.</li>
+        <li><span class="pill">Local-First</span> SQLite-backed store, scripts for start/stop, and minimal reverse proxy needs.</li>
+        <li><span class="pill">Parity</span> Shares conversation and chat flows with the layered stack while reducing moving parts.</li>
+      </ul>
+    </section>
+
+    <section id="webapp">
+      <h3>WebApp (React)</h3>
+      <ul>
+        <li><span class="pill">Stack</span> Vite + React + TypeScript with Tailwind styling.</li>
+        <li><span class="pill">Data</span> Consumes Gateway.Api for auth, conversations, history, and streaming chat responses.</li>
+        <li><span class="pill">UX</span> Chat-first UI, model selection, status indicators, and error surfaces.</li>
+      </ul>
+    </section>
+
+    <section id="tests">
+      <h3>Testing Modules</h3>
+      <ul>
+        <li><span class="pill">Unit</span> Gateway.UnitTests mock ports to focus on domain/application logic.</li>
+        <li><span class="pill">Integration</span> Gateway.IntegrationTests exercise HTTP endpoints with a test database.</li>
+        <li><span class="pill">Frontend</span> WebApp tests can cover rendering and API contracts via Vitest/Playwright.</li>
+      </ul>
+    </section>
+  </section>
+</main>
+</body>
+</html>
