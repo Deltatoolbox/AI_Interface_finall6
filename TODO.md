@@ -1,60 +1,30 @@
-# LM Studio Chat Gateway - Feature Roadmap
+# Audit Findings & TODOs
 
-## 🎨 **UI/UX Verbesserungen**
-- [x] **Chat Export/Import** - Conversations als JSON/Markdown exportieren/importieren ✅
-- [x] **Chat Templates** - Vordefinierte Gesprächsstarter für verschiedene Anwendungsfälle ✅
-- [x] **Backup/Restore** - Automatische Datenbank-Backups ✅
-- [x] **Message Search** - Volltextsuche durch alle Conversations ✅
-- [x] **Chat Categories/Tags** - Conversations kategorisieren und filtern ✅
-- [x] **Rich Text Editor** - Formatierung für Nachrichten (Bold, Italic, Code-Blöcke, Markdown, LaTeX) ✅
-- [x] **File Upload** - Bilder, Dokumente in Chats hochladen und analysieren lassen ✅
-- [x] **Chat Sharing** - Conversations mit anderen Usern teilen ✅
+This document lists bugs, security vulnerabilities, and missing features identified during the code audit.
 
-## 🔧 **System Features**
-- [x] **Model Management** - Verschiedene LM Studio Models pro Conversation auswählen ✅
-- [ ] **Backup/Restore** - Automatische Datenbank-Backups
-- [x] **Health Monitoring** - System-Performance Dashboard erweitern ✅
-- [x] **Logging/Audit Trail** - Wer hat was wann gemacht, einsehbar im debug channel ✅
-- [x] **User Groups/Roles** - Mehrere Admin-Level, Moderatoren ✅
+## 🐛 Bugs
 
-## 👥 **User Management**
-- [x] **Guest Mode** - Temporäre Accounts ohne Registrierung ✅
-- [x] **SSO Integration** - LDAP/Active Directory Anbindung ✅
-- [x] **User Profiles** - Avatare, Bio, Präferenzen ✅
+- [ ] **Chat Persistence Failure**: In `Program.cs`, the `/api/chat` endpoint generates a new random `conversationId` for the chat stream instead of using the ID of the conversation created immediately before. This causes `ChatService.SaveMessagesAsync` to fail (FK violation) when trying to save messages to a non-existent conversation.
+  - *Fix*: Use the `Id` from the `ConversationResponse` returned by `conversationService.CreateConversationAsync` in `Program.cs`.
 
-## 🔒 **Security & Privacy**
-- [ ] **End-to-End Encryption** - Conversations verschlüsselt speichern, https soll verwendet werden
-- [ ] **GDPR Compliance** - Datenexport, Löschung, Einverständniserklärungen
-- [ ] **Session Management** - Aktive Sessions verwalten
-- [ ] **Two-Factor Authentication** - 2FA für alle User (optional, nie Pflicht)
+## 🔒 Security Issues
 
-## 🔌 **Integration & APIs**
-- [ ] **Webhook Support** - Externe Systeme benachrichtigen
-- [ ] **REST API** - Vollständige API für externe Anwendungen
-- [ ] **Plugin System** - Erweiterbare Architektur
-- [ ] **Slack/Discord Integration** - Chats in anderen Plattformens
+- [ ] **Hardcoded JWT Key**: `appsettings.json` contains a placeholder JWT key (`your-super-secret-jwt-key...`). This is a risk if not changed in production.
+  - *Fix*: Ensure this is overridden by environment variables and document the requirement.
+- [ ] **Weak Default Admin Password**: `Program.cs` defaults the admin password to "admin".
+  - *Fix*: Require `ADMIN_PASSWORD` env var or generate a strong random password on startup if not set, and log it.
+- [ ] **Missing CSRF Protection**: While a CSRF token endpoint exists (`/api/auth/csrf`), there is no middleware validating the token on state-changing requests (POST/PUT/DELETE).
+  - *Fix*: Add Antiforgery middleware or manual token validation.
+- [ ] **Permissive CORS**: `Program.cs` allows any method and header (`AllowAnyMethod`, `AllowAnyHeader`) which might be too permissive compared to `appsettings.json` configuration.
+  - *Fix*: Restrict to configured origins and headers.
 
-## 📱 **Desktop Features**
-- [ ] **Progressive Web App** - Offline-Funktionalität
-- [ ] **Keyboard Shortcuts** - Power-User Features
-- [ ] **Dark/Light Mode** - Automatische Theme-Umschaltung (bereits implementiert)
+## 🚀 Missing Features
 
----
-
-## ❌ **Ausgeschlossene Features**
-- Voice Input/Output
-- System Features (unnötig)
-- Activity Feed
-- IP Whitelisting
-- AI Features (alle)
-- Analytics
-- Mobile Apps
-- Accessibility Features
-- Multi-Language Support
-
----
-
-## 🎯 **Prioritäten**
-1. **Hoch**: Chat Export/Import, Message Search, Model Management
-2. **Mittel**: File Upload, Chat Categories, Custom System Prompts
-3. **Niedrig**: Plugin System, SSO Integration, Calendar Integration
+- [ ] **User Management**: No endpoints exist to create, list, or delete users. Only the default admin user exists.
+  - *Feature*: Add `POST /api/users`, `GET /api/users`, `DELETE /api/users/{id}` (Admin only).
+- [ ] **Password Management**: No mechanism for users to change their password or reset it.
+  - *Feature*: Add `POST /api/auth/change-password`.
+- [ ] **Rate Limiting**: Rate limiting configuration exists in `appsettings.json` but the middleware is not registered in `Program.cs`.
+  - *Fix*: Add `app.UseRateLimiter()` and configure policies.
+- [ ] **Registration**: No public user registration flow.
+  - *Feature*: Add `POST /api/auth/register` (optional, depending on requirements).
