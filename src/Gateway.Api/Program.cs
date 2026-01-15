@@ -57,6 +57,16 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ConversationService>();
 builder.Services.AddScoped<ChatService>();
 
+var jwtKey = builder.Configuration["Security:JwtKey"];
+if (string.IsNullOrEmpty(jwtKey) || jwtKey == "your-super-secret-jwt-key-change-this-in-production")
+{
+    if (builder.Environment.IsProduction())
+    {
+        throw new InvalidOperationException("Security:JwtKey must be securely configured in production. Please set the 'Security:JwtKey' environment variable.");
+    }
+    Console.WriteLine("WARNING: Using insecure default JWT Key. Set Security:JwtKey.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -78,15 +88,27 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddCors(options =>
 {
-    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+    var corsSection = builder.Configuration.GetSection("Cors");
+    var allowedOrigins = corsSection.GetSection("AllowedOrigins").Get<string[]>()
         ?? new[] { "https://gateway.local", "http://localhost:5173" };
     
+    var allowedMethods = corsSection.GetSection("AllowedMethods").Get<string[]>();
+    var allowedHeaders = corsSection.GetSection("AllowedHeaders").Get<string[]>();
+
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(allowedOrigins)
-            .AllowAnyMethod()
-            .AllowAnyHeader()
             .AllowCredentials();
+
+        if (allowedMethods != null && allowedMethods.Length > 0)
+            policy.WithMethods(allowedMethods);
+        else
+            policy.AllowAnyMethod();
+
+        if (allowedHeaders != null && allowedHeaders.Length > 0)
+            policy.WithHeaders(allowedHeaders);
+        else
+            policy.AllowAnyHeader();
     });
 });
 
@@ -214,10 +236,10 @@ app.MapPost("/api/chat", async (
         return Results.Unauthorized();
     }
 
-    var conversationId = Guid.NewGuid();
     var conversationTitle = request.Messages.FirstOrDefault(m => m.Role == "user")?.Content?[..Math.Min(50, request.Messages.FirstOrDefault(m => m.Role == "user")?.Content?.Length ?? 0)] ?? "New Conversation";
     
-    await conversationService.CreateConversationAsync(userIdGuid, new CreateConversationRequest(conversationTitle));
+    var conversation = await conversationService.CreateConversationAsync(userIdGuid, new CreateConversationRequest(conversationTitle));
+    var conversationId = conversation.Id;
 
     var stream = await chatService.ProcessChatAsync(userIdGuid, conversationId, request);
 
@@ -298,7 +320,13 @@ using (var scope = app.Services.CreateScope())
     var adminUser = await userRepository.GetByUsernameAsync("admin");
     if (adminUser == null)
     {
-        var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "admin";
+        var adminPassword = app.Configuration["ADMIN_PASSWORD"];
+        if (string.IsNullOrEmpty(adminPassword))
+        {
+            adminPassword = Guid.NewGuid().ToString("N").Substring(0, 16);
+            Log.Warning("No ADMIN_PASSWORD environment variable found. Generated random password for 'admin': {AdminPassword}", adminPassword);
+        }
+
         var admin = new Gateway.Domain.Entities.User
         {
             Id = Guid.NewGuid(),

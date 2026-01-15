@@ -20,6 +20,8 @@ public class AuthIntegrationTests : IClassFixture<WebApplicationFactory<Program>
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseSetting("ADMIN_PASSWORD", "admin");
+
             builder.ConfigureServices(services =>
             {
                 var descriptor = services.SingleOrDefault(

@@ -4,18 +4,18 @@ This document lists bugs, security vulnerabilities, and missing features identif
 
 ## 🐛 Bugs
 
-- [ ] **Chat Persistence Failure**: In `Program.cs`, the `/api/chat` endpoint generates a new random `conversationId` for the chat stream instead of using the ID of the conversation created immediately before. This causes `ChatService.SaveMessagesAsync` to fail (FK violation) when trying to save messages to a non-existent conversation.
+- [x] **Chat Persistence Failure**: In `Program.cs`, the `/api/chat` endpoint generates a new random `conversationId` for the chat stream instead of using the ID of the conversation created immediately before. This causes `ChatService.SaveMessagesAsync` to fail (FK violation) when trying to save messages to a non-existent conversation.
   - *Fix*: Use the `Id` from the `ConversationResponse` returned by `conversationService.CreateConversationAsync` in `Program.cs`.
 
 ## 🔒 Security Issues
 
-- [ ] **Hardcoded JWT Key**: `appsettings.json` contains a placeholder JWT key (`your-super-secret-jwt-key...`). This is a risk if not changed in production.
+- [x] **Hardcoded JWT Key**: `appsettings.json` contains a placeholder JWT key (`your-super-secret-jwt-key...`). This is a risk if not changed in production.
   - *Fix*: Ensure this is overridden by environment variables and document the requirement.
-- [ ] **Weak Default Admin Password**: `Program.cs` defaults the admin password to "admin".
+- [x] **Weak Default Admin Password**: `Program.cs` defaults the admin password to "admin".
   - *Fix*: Require `ADMIN_PASSWORD` env var or generate a strong random password on startup if not set, and log it.
 - [ ] **Missing CSRF Protection**: While a CSRF token endpoint exists (`/api/auth/csrf`), there is no middleware validating the token on state-changing requests (POST/PUT/DELETE).
   - *Fix*: Add Antiforgery middleware or manual token validation.
-- [ ] **Permissive CORS**: `Program.cs` allows any method and header (`AllowAnyMethod`, `AllowAnyHeader`) which might be too permissive compared to `appsettings.json` configuration.
+- [x] **Permissive CORS**: `Program.cs` allows any method and header (`AllowAnyMethod`, `AllowAnyHeader`) which might be too permissive compared to `appsettings.json` configuration.
   - *Fix*: Restrict to configured origins and headers.
 
 ## 🚀 Missing Features
