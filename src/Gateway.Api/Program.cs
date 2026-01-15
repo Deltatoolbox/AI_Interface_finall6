@@ -5,6 +5,7 @@ using Gateway.Domain.Interfaces;
 using Gateway.Infrastructure.Data;
 using Gateway.Infrastructure.Repositories;
 using Gateway.Infrastructure.Services;
+using Gateway.Api.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -27,10 +28,6 @@ builder.Services.AddDbContext<GatewayDbContext>(options =>
     if (provider.ToLower() == "sqlite")
     {
         options.UseSqlite(connectionString);
-    }
-    else if (provider.ToLower() == "postgresql")
-    {
-        options.UseNpgsql(connectionString);
     }
     else
     {
@@ -114,6 +111,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddMemoryCache();
 
+builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -243,11 +241,10 @@ app.MapPost("/api/chat", async (
 
     var stream = await chatService.ProcessChatAsync(userIdGuid, conversationId, request);
 
-    return Results.Stream(stream, "text/event-stream", new Dictionary<string, string>
-    {
-        ["Cache-Control"] = "no-cache",
-        ["Connection"] = "keep-alive"
-    });
+    context.Response.Headers.CacheControl = "no-cache";
+    context.Response.Headers.Append("Connection", "keep-alive");
+
+    return Results.Stream(stream, "text/event-stream");
 })
 .WithName("Chat")
 .WithOpenApi()
@@ -314,7 +311,10 @@ app.MapGet("/api/conversations/{id:guid}", async (Guid id, HttpContext context, 
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
-    await context.Database.MigrateAsync();
+    if (context.Database.IsRelational())
+    {
+        await context.Database.MigrateAsync();
+    }
     
     var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
     var adminUser = await userRepository.GetByUsernameAsync("admin");
@@ -325,6 +325,11 @@ using (var scope = app.Services.CreateScope())
         {
             adminPassword = Guid.NewGuid().ToString("N").Substring(0, 16);
             Log.Warning("No ADMIN_PASSWORD environment variable found. Generated random password for 'admin': {AdminPassword}", adminPassword);
+        }
+        else
+        {
+             // Temporary debug
+             Console.WriteLine($"ADMIN_PASSWORD found: {adminPassword}");
         }
 
         var admin = new Gateway.Domain.Entities.User
@@ -344,3 +349,5 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+public partial class Program { }

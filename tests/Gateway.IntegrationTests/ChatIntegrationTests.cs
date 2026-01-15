@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Configuration;
 using Gateway.Infrastructure.Data;
 using Gateway.Application.DTOs;
 using Gateway.Domain.Interfaces;
@@ -23,8 +24,13 @@ public class ChatIntegrationTests : IClassFixture<WebApplicationFactory<Program>
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
-            // Set known admin password to bypass random generation in Program.cs
-            builder.UseSetting("ADMIN_PASSWORD", "testpassword");
+            builder.ConfigureAppConfiguration((ctx, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    {"ADMIN_PASSWORD", "testpassword"}
+                });
+            });
 
             builder.ConfigureServices(services =>
             {
@@ -42,7 +48,10 @@ public class ChatIntegrationTests : IClassFixture<WebApplicationFactory<Program>
             });
         });
 
-        _client = _factory.CreateClient();
+        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true
+        });
     }
 
     [Fact]
@@ -53,6 +62,8 @@ public class ChatIntegrationTests : IClassFixture<WebApplicationFactory<Program>
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", loginRequest);
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
+        var setCookie = loginResponse.Headers.GetValues("Set-Cookie").FirstOrDefault();
+
         // 2. Send Chat Request
         var chatRequest = new ChatRequest(
             "test-model",
@@ -61,6 +72,12 @@ public class ChatIntegrationTests : IClassFixture<WebApplicationFactory<Program>
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/chat");
         requestMessage.Content = JsonContent.Create(chatRequest);
+
+        if (setCookie != null)
+        {
+            var cookieValue = setCookie.Split(';')[0];
+            requestMessage.Headers.Add("Cookie", cookieValue);
+        }
 
         var chatResponse = await _client.SendAsync(requestMessage);
         chatResponse.StatusCode.Should().Be(HttpStatusCode.OK);

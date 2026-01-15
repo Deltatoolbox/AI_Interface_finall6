@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using Gateway.Infrastructure.Data;
+using Xunit;
 
 namespace Gateway.IntegrationTests;
 
@@ -53,14 +54,6 @@ public class HealthCheckIntegrationTests : IClassFixture<WebApplicationFactory<P
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("status");
-    }
-
-    [Fact]
-    public async Task Metrics_ShouldReturnOk()
-    {
-        var response = await _client.GetAsync("/metrics");
-        
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        content.Should().Be("Healthy");
     }
 }

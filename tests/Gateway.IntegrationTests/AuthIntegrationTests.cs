@@ -8,6 +8,8 @@ using System.Net;
 using System.Net.Http.Json;
 using Gateway.Infrastructure.Data;
 using Gateway.Application.DTOs;
+using Microsoft.Extensions.Configuration;
+using Xunit;
 
 namespace Gateway.IntegrationTests;
 
@@ -20,7 +22,13 @@ public class AuthIntegrationTests : IClassFixture<WebApplicationFactory<Program>
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("ADMIN_PASSWORD", "admin");
+            builder.ConfigureAppConfiguration((ctx, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string>
+                {
+                    {"ADMIN_PASSWORD", "admin"}
+                });
+            });
 
             builder.ConfigureServices(services =>
             {

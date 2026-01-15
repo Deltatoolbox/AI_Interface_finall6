@@ -15,8 +15,8 @@ public class ChatRequestValidatorTests
         var request = new ChatRequest(
             "test-model",
             new[] { new ChatMessageDto("user", "Hello") },
-            temperature: 0.7,
-            maxTokens: 100
+            Temperature: 0.7,
+            MaxTokens: 100
         );
         
         var result = _validator.Validate(request);
@@ -61,7 +61,7 @@ public class ChatRequestValidatorTests
         var request = new ChatRequest(
             "test-model",
             new[] { new ChatMessageDto("user", "Hello") },
-            temperature: temperature
+            Temperature: temperature
         );
         
         var result = _validator.Validate(request);
@@ -78,7 +78,7 @@ public class ChatRequestValidatorTests
         var request = new ChatRequest(
             "test-model",
             new[] { new ChatMessageDto("user", "Hello") },
-            maxTokens: maxTokens
+            MaxTokens: maxTokens
         );
         
         var result = _validator.Validate(request);

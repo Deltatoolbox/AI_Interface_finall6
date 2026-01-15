@@ -10,17 +10,22 @@ namespace Gateway.UnitTests.Services;
 public class ConcurrencyManagerTests
 {
     private readonly Mock<ILogger<ConcurrencyManager>> _loggerMock;
-    private readonly Mock<IConfiguration> _configurationMock;
     private readonly ConcurrencyManager _concurrencyManager;
 
     public ConcurrencyManagerTests()
     {
         _loggerMock = new Mock<ILogger<ConcurrencyManager>>();
-        _configurationMock = new Mock<IConfiguration>();
-        _configurationMock.Setup(x => x.GetValue<int>("Limits:MaxConcurrentPerModel", 2)).Returns(2);
-        _configurationMock.Setup(x => x.GetValue<int>("Limits:MaxActiveStreamsPerUser", 2)).Returns(2);
         
-        _concurrencyManager = new ConcurrencyManager(_loggerMock.Object, _configurationMock.Object);
+        var inMemorySettings = new Dictionary<string, string> {
+            {"Limits:MaxConcurrentPerModel", "2"},
+            {"Limits:MaxActiveStreamsPerUser", "2"},
+        };
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings!)
+            .Build();
+
+        _concurrencyManager = new ConcurrencyManager(_loggerMock.Object, configuration);
     }
 
     [Fact]
@@ -54,16 +59,16 @@ public class ConcurrencyManagerTests
     }
 
     [Fact]
-    public void ReleaseUserStreamSlot_ShouldDecreaseCount()
+    public async Task ReleaseUserStreamSlot_ShouldDecreaseCount()
     {
         var userId = Guid.NewGuid();
         
-        _concurrencyManager.TryAcquireUserStreamSlotAsync(userId).Wait();
-        _concurrencyManager.TryAcquireUserStreamSlotAsync(userId).Wait();
+        await _concurrencyManager.TryAcquireUserStreamSlotAsync(userId);
+        await _concurrencyManager.TryAcquireUserStreamSlotAsync(userId);
         
         _concurrencyManager.ReleaseUserStreamSlot(userId);
         
-        var result = _concurrencyManager.TryAcquireUserStreamSlotAsync(userId).Result;
+        var result = await _concurrencyManager.TryAcquireUserStreamSlotAsync(userId);
         result.Should().BeTrue();
     }
 }
